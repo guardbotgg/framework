@@ -1,6 +1,6 @@
 {
   "name": "@guardbot/framework",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A simple framework made for building discord bots with discord.js.",
   "main": "./build/index.js",
   "module": "./build/index.mjs",

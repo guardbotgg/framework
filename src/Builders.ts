@@ -7,7 +7,7 @@ export {
   SlashCommandNumberOption as NumberOption,
   SlashCommandRoleOption as RoleOption,
   SlashCommandStringOption as StringOption,
+  SlashCommandUserOption as UserOption,
   SlashCommandSubcommandBuilder as SubcommandBuilder,
   SlashCommandSubcommandGroupBuilder as SubcommandGroupBuilder,
-  SlashCommandOptionsOnlyBuilder as SlashCommandOptionsBuilder,
 } from 'discord.js';
