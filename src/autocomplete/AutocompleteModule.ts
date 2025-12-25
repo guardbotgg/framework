@@ -25,7 +25,7 @@ export default class AutocompleteModule extends EventEmitter {
 
   async load(filepath: string, reload: boolean = false) {
     const completerModule = await import(pathToFileURL(filepath).href);
-    const completer: FrameworkAutocompleter = completerModule.autocomplete ?? completerModule.default ?? completerModule;
+    const completer: FrameworkAutocompleter = completerModule.autocomplete ?? completerModule.default?.default ?? completerModule.default ?? completerModule;
 
     if (typeof completer !== 'object' || !completer.name || completer.disabled) return false;
     if (!reload && this.client.autocomplete.has(completer.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'autocomplete', completer.id);

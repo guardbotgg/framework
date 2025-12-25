@@ -43,9 +43,9 @@ export default class FrameworkClient<Ready extends boolean = boolean> extends Di
 
 
   public async start(token: string) {
+    await this.listenerModule.loadAll();
     await this.autocompleteModule.loadAll();
     await this.commandsModule.loadAll();
-    await this.listenerModule.loadAll();
     await this.login(token);
   }
 }

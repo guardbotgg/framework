@@ -14,7 +14,7 @@ export default class ListenerModule {
 
   async load(filepath: string, reload: boolean = false) {
     const listenerModule = await import(pathToFileURL(filepath).href);
-    const listener: FrameworkListener = listenerModule.listener ?? listenerModule.default ?? listenerModule;
+    const listener: FrameworkListener = listenerModule.listener ?? listenerModule.default?.default ?? listenerModule.default ?? listenerModule;
 
     if (typeof listener !== 'object' || !listener.name || listener.disabled) return false;
     if (!reload && this.client.events.has(listener.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'listener', listener.id);
