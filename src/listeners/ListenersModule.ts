@@ -13,7 +13,7 @@ export default class ListenerModule {
   }
 
   async load(filepath: string, reload: boolean = false) {
-    const listenerModule = await import(pathToFileURL(filepath).href);
+    const listenerModule = reload ? require(filepath) : await import(pathToFileURL(filepath).href);
     const listener: FrameworkListener = listenerModule.listener ?? listenerModule.default?.default ?? listenerModule.default ?? listenerModule;
 
     if (typeof listener !== 'object' || !listener.name || listener.disabled) return false;
@@ -40,12 +40,12 @@ export default class ListenerModule {
     }
   }
 
-  reload(id: string) {
+  async reload(id: string) {
     if (!this.client.events.has(id)) throw new FrameworkError('UnknownComponent', 'listener', id);
     const listener = this.client.events.get(id)!;
 
     this.unload(id, true);
-    this.load(listener.filepath, true);
+    await this.load(listener.filepath, true);
   }
 
   private unload(id: string, reload: boolean = false) {
@@ -53,7 +53,7 @@ export default class ListenerModule {
     const listener = this.client.events.get(id)!;
 
     if (listener._execute) this.client.off(listener.name, listener._execute);
-    delete require.cache[listener.filepath];
+    delete require.cache[require.resolve(listener.filepath)];
     if (!reload) this.client.events.delete(id);
   }
 }

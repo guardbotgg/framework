@@ -24,7 +24,7 @@ export default class AutocompleteModule extends EventEmitter {
   }
 
   async load(filepath: string, reload: boolean = false) {
-    const completerModule = await import(pathToFileURL(filepath).href);
+    const completerModule = reload ? require(filepath) : await import(pathToFileURL(filepath).href);
     const completer: FrameworkAutocompleter = completerModule.autocomplete ?? completerModule.default?.default ?? completerModule.default ?? completerModule;
 
     if (typeof completer !== 'object' || !completer.name || completer.disabled) return false;
@@ -48,19 +48,19 @@ export default class AutocompleteModule extends EventEmitter {
     }
   }
 
-  reload(id: string) {
+  async reload(id: string) {
     const completer = this.client.autocomplete.get(id);
     if (!completer) throw new FrameworkError('UnknownComponent', 'autocomplete', id);
 
     this.unload(id, true);
-    this.load(completer.filepath, true);
+    await this.load(completer.filepath, true);
   }
 
   private unload(id: string, reload: boolean = false) {
     if (!this.client.autocomplete.has(id)) throw new FrameworkError('UnknownComponent', 'autocomplete', id);
     const completer = this.client.autocomplete.get(id)!;
 
-    delete require.cache[completer.filepath];
+    delete require.cache[require.resolve(completer.filepath)];
     if (!reload) this.client.autocomplete.delete(id);
   }
 

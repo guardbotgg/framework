@@ -40,7 +40,7 @@ export default class CommandsModule extends EventEmitter {
 
 
   async load(filepath: string, reload: boolean = false) {
-    const commandModule = await import(pathToFileURL(filepath).href);
+    const commandModule = reload ? require(filepath) : await import(pathToFileURL(filepath).href);
     const command: FrameworkCommand = commandModule?.command ?? commandModule?.default?.default ?? commandModule?.default ?? commandModule;
 
     if (typeof command !== 'object' || !command.name || command.disabled) return false;
@@ -70,12 +70,12 @@ export default class CommandsModule extends EventEmitter {
   }
 
  
-  reload(id: string) {
+  async reload(id: string) {
     if (!this.client.commands.has(id)) throw new FrameworkError('UnknownComponent', 'commands', id);
     const command = this.client.commands.get(id)!;
 
     this.unload(id, true);
-    this.load(command.filepath, true);
+    await this.load(command.filepath, true);
   }
 
 
@@ -83,7 +83,7 @@ export default class CommandsModule extends EventEmitter {
     if (!this.client.commands.has(id)) throw new FrameworkError('UnknownComponent', 'commands', id);
     const command = this.client.commands.get(id)!;
     
-    delete require.cache[command.filepath];
+    delete require.cache[require.resolve(command.filepath)];
     if (!reload) this.client.commands.delete(id);
   }
 
@@ -129,7 +129,7 @@ export default class CommandsModule extends EventEmitter {
     if (!commandName) return;
 
     const commandId = `Message:${commandName}`;
-    const command = this.client.commands.get(commandId) || this.client.commands.get(this.client.aliases.get(commandId) || '');
+    const command = this.client.commands.get(commandId) || this.client.commands.get(this.client.aliases.get(commandName) || '');
     if (!command || command.commandType !== 'Message' || command.disabled || (command.devOnly && !this.client.developers.includes(message.author.id))) return;
     if ((!message.inGuild() && !command.contexts.includes('BotDM')) || (message.inGuild() && !command.contexts.includes('Guild'))) return;
 
