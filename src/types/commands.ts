@@ -1,4 +1,4 @@
-import { ApplicationCommandOptionData, ApplicationIntegrationType, AutocompleteInteraction, ChatInputCommandInteraction, CommandInteraction, ContextMenuCommandInteraction, Interaction, InteractionContextType, LocalizationMap, Message, PermissionResolvable, PermissionsString } from 'discord.js';
+import { ApplicationCommandOptionData, ApplicationIntegrationType, AutocompleteInteraction, ChatInputCommandInteraction, CommandInteraction, ContextMenuCommandInteraction, Interaction, InteractionContextType, LocalizationMap, Message, PermissionResolvable, PermissionsString, ToAPIApplicationCommandOptions } from 'discord.js';
 import FrameworkClient from '../FrameworkClient';
 
 
@@ -67,7 +67,7 @@ interface MessageCommandOptions extends BaseCommandOptions {
 interface SlashCommandOptions extends BaseAppCommandOptions {
   commandType: 'Slash';
   /** The Application Command Options of this Command */
-  options?: ApplicationCommandOptionData[];
+  options?: (ApplicationCommandOptionData | ToAPIApplicationCommandOptions)[];
   execute: (client: FrameworkClient<true>, interaction: ChatInputCommandInteraction) => Promise<unknown>;
   autocomplete?: (client: FrameworkClient<true>, interaction: AutocompleteInteraction) => Promise<unknown>;
 }

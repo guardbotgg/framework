@@ -265,7 +265,9 @@ export default class CommandsModule extends EventEmitter {
       integrationTypes: resolveIntegrationTypes(command.integrationTypes),
       nameLocalizations: command.nameLocalizations,
       descriptionLocalizations: command.descriptionLocalizations,
-      ...(command.commandType === 'Slash' ? { options: command.options ?? [] } : {}),
+      ...(command.commandType === 'Slash' ? { 
+        options: command.options ? command.options.map((op: any) => typeof op.toJSON === 'function' ? op.toJSON() : op) : []
+      } : {}),
     };
   }
 }
