@@ -1,11 +1,24 @@
-## Description
-describe what changes this PR includes and explain why are they needed.
+## PR Summary
+<!-- Briefly describe a summary of your changes and the motivation in this PR. -->
 
-Fixes # (issue)
+## Related Issue
+<!-- List any related issues, e.g. Fixes #123 or Closes #456 -->
+Closes # (issue number)
 
-## Screenshots
-If applicable, add screenshots to explain the change.
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Refactor
+- [ ] Other (please describe)
 
-## Status
-- [ ] These changes have been tested and formatted properly.
-- [ ] This PR introduces some Breaking changes
+## Screenshots (if applicable)
+<!-- Add before/after screenshots if this affects rendering. -->
+
+## Checklist
+- [ ] Code follows project structure
+- [ ] Linked relevant issue(s)
+- [ ] No breaking changes
+- [ ] Tested locally
+
+## Additional Notes
+<!-- Anything else reviewers should know. -->
