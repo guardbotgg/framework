@@ -1,30 +1,32 @@
-import { Autocompleter } from './autocomplete/Autocompleter';
-import { ContextCommand } from './commands/ContextCommand';
-import { MessageCommand } from './commands/MessageCommand';
-import { SlashCommand } from './commands/SlashCommand';
-import { Listener } from './listeners/Listener';
-import FrameworkClient from './FrameworkClient';
-import './extensions/Message';
+export { FrameworkClient } from './core/FrameworkClient';
+export { Autocompleter } from './builders/autocompleters/Autocompleter';
+export { ContextCommand } from './builders/commands/ContextCommand';
+export { MessageCommand } from './builders/commands/MessageCommand';
+export { SlashCommand } from './builders/commands/SlashCommand';
+export { Listener } from './builders/listeners/Listener';
+import './extensions';
 
 
-export * from './Builders';
-
-export {
+export type {
   FrameworkAutocompleter,
   FrameworkCommand,
   FrameworkSlashCommand,
   FrameworkMessageCommand,
   FrameworkContextCommand,
   FrameworkListener,
-  CommandHandlerName,
-  CommandModuleHandler,
-} from './types/index';
+} from './types';
+
 
 export {
-  FrameworkClient,
-  Autocompleter,
-  ContextCommand,
-  MessageCommand,
-  SlashCommand,
-  Listener,
-}
+  SlashCommandAttachmentOption as AttachmentOption,
+  SlashCommandBooleanOption as BooleanOption,
+  SlashCommandChannelOption as ChannelOption,
+  SlashCommandIntegerOption as IntegerOption,
+  SlashCommandMentionableOption as MentionableOption,
+  SlashCommandNumberOption as NumberOption,
+  SlashCommandRoleOption as RoleOption,
+  SlashCommandStringOption as StringOption,
+  SlashCommandUserOption as UserOption,
+  SlashCommandSubcommandBuilder as SubcommandBuilder,
+  SlashCommandSubcommandGroupBuilder as SubcommandGroupBuilder,
+} from 'discord.js';

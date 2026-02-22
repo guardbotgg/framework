@@ -1,5 +1,5 @@
-import { FrameworkError, FrameworkTypeError } from '../utils/errors';
-import { AutocompleterOptions } from '../types';
+import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
+import { AutocompleterOptions } from '../../types';
 
 
 export function Autocompleter(options: AutocompleterOptions) {
@@ -12,6 +12,8 @@ export function Autocompleter(options: AutocompleterOptions) {
 
   if (!options.execute) throw new FrameworkError('InvalidOption', 'execute');
   if (typeof options.execute !== 'function') throw new FrameworkTypeError('InvalidType', 'execute', 'function', typeof options.execute);
+  
+  if (options.commands && !Array.isArray(options.commands)) throw new FrameworkTypeError('InvalidType', 'commands', 'string[]', typeof options.commands);
   if (options.disabled !== undefined && typeof options.disabled !== 'boolean') throw new FrameworkTypeError('InvalidType', 'disabled', 'boolean', typeof options.disabled);
 
   return {

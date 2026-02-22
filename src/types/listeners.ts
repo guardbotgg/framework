@@ -1,30 +1,27 @@
 import { ClientEvents } from 'discord.js';
 
 
-interface ListenerOptions<T extends keyof ClientEvents = keyof ClientEvents> {
-  /** Name of the Listener. */
+type Result = unknown | void;
+export interface ListenerOptions<T extends keyof ClientEvents = keyof ClientEvents> {
+  /** Name of the Listener */
   name: T;
-  /** Wheather to execute the function only Once. */
+  /** Whether to execute only once */
   once?: boolean;
-  /** Whether the Listener is disabled. */
+  /** Whether the Listener is disabled */
   disabled?: boolean;
   /** Handles the execution of the Listener */
-  execute: (...args: ClientEvents[T]) => Promise<boolean>;
+  execute: (...args: ClientEvents[T]) => Promise<Result> | Result;
 }
 
-
-interface FrameworkListener<T extends keyof ClientEvents = keyof ClientEvents> {
+interface BaseListenerMeta {
   id: string;
   filepath: string;
+}
+
+export interface FrameworkListener<T extends keyof ClientEvents = keyof ClientEvents> extends BaseListenerMeta {
   name: T;
   once: boolean;
   disabled: boolean;
-  execute: (...args: ClientEvents[T]) => Promise<boolean>;
-  _execute?: (...args: ClientEvents[T]) => Promise<boolean>;
-}
-
-
-export {
-  ListenerOptions,
-  FrameworkListener,
+  execute: (...args: ClientEvents[T]) => Promise<Result> | Result;
+  _execute?: (...args: ClientEvents[T]) => Promise<Result> | Result;
 }
