@@ -1,16 +1,15 @@
 import { Message, MessageCollector, Message as DiscordMessage, InteractionCollector, InteractionType, ModalSubmitInteraction } from 'discord.js';
 import { AwaitMemberResponseOptions, ModalCollectorOptions } from '../types';
 
-
-function prefix(this: Message) {
+export function prefix(this: Message) {
   return this.client.prefix;
 }
 
-function isDeveloper(this: Message) {
+export function isDeveloper(this: Message) {
   return this.client.developers.includes(this.author.id);
 }
 
-function awaitMemberResponse(this: Message, options: AwaitMemberResponseOptions = {}) {
+export function awaitMemberResponse(this: Message, options: AwaitMemberResponseOptions = {}) {
   return new Promise<DiscordMessage>((resolve, reject) => {
     if (!this.channel) {
       return reject(new Error('Channel not available for this message.'));
@@ -35,7 +34,7 @@ function awaitMemberResponse(this: Message, options: AwaitMemberResponseOptions 
   })
 }
 
-function createModalSubmitCollector(this: Message, options: ModalCollectorOptions = {}) {
+export function createModalSubmitCollector(this: Message, options: ModalCollectorOptions = {}) {
   return new InteractionCollector<ModalSubmitInteraction>(this.client, { 
     ...options, 
     interactionType: InteractionType.ModalSubmit, 
@@ -43,7 +42,7 @@ function createModalSubmitCollector(this: Message, options: ModalCollectorOption
   });
 }
 
-function awaitModalSubmitComponent(this: Message, options: ModalCollectorOptions = {}) {
+export function awaitModalSubmitComponent(this: Message, options: ModalCollectorOptions = {}) {
   return new Promise<ModalSubmitInteraction>((resolve, reject) => {
     const collector = new InteractionCollector<ModalSubmitInteraction>(this.client, {
       time: 60000, 
@@ -61,12 +60,3 @@ function awaitModalSubmitComponent(this: Message, options: ModalCollectorOptions
     })
   })
 }
-
-
-Object.defineProperties(Message.prototype, {
-  prefix: { get: prefix, configurable: true },
-  isDeveloper: { value: isDeveloper, writable: true, configurable: true },
-  awaitMemberResponse: { value: awaitMemberResponse, writable: true, configurable: true },
-  createModalSubmitCollector: { value: createModalSubmitCollector, writable: true, configurable: true },
-  awaitModalSubmitComponent: { value: awaitModalSubmitComponent, writable: true, configurable: true },
-})

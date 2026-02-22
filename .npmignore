@@ -12,6 +12,9 @@ tsconfig.json
 .github/
 .git/
 
+.DS_Store
+Thumbs.db
+
 .vscode/
 .idea/
 

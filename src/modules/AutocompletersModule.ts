@@ -1,21 +1,19 @@
-import { FrameworkAutocompleter, FrameworkSlashCommand } from '../types';
-import { Interaction, AutocompleteInteraction } from 'discord.js';
-import FrameworkClient from '../FrameworkClient';
-import { FrameworkError } from '../utils/errors';
-import { listFiles } from '../utils/utils';
-import { pathToFileURL } from 'node:url';
+import { listFiles, pathToFileURL, resolvePath } from '../utils';
+import { FrameworkError } from '../core/FrameworkError';
+import { FrameworkClient } from '../core/FrameworkClient';
+import { FrameworkAutocompleter } from '../types';
+import { Interaction } from 'discord.js';
 import EventEmitter from 'events';
-import path from 'path';
 
 
 /**
- * @class AutocompleteModule
- * @fires AutocompleteModule#execute
- * @fires AutocompleteModule#success
- * @fires AutocompleteModule#error
- * @fires AutocompleteModule#unknown
+ * @class AutocompletersModule
+ * @fires AutocompletersModule#execute
+ * @fires AutocompletersModule#success
+ * @fires AutocompletersModule#error
+ * @fires AutocompletersModule#unknown
  */
-export default class AutocompleteModule extends EventEmitter {
+export default class AutocompletersModule extends EventEmitter {
   private client: FrameworkClient<true>;
   constructor(client: FrameworkClient) {
     super();
@@ -24,24 +22,23 @@ export default class AutocompleteModule extends EventEmitter {
   }
 
   async load(filepath: string, reload: boolean = false) {
-    const completerModule = reload ? require(filepath) : await import(pathToFileURL(filepath).href);
-    const completer: FrameworkAutocompleter = completerModule.autocomplete ?? completerModule.default?.default ?? completerModule.default ?? completerModule;
+    const module = await import(pathToFileURL(filepath).href  + `?update=${Date.now()}`);
+    const completer: FrameworkAutocompleter = module.autocomplete ?? module.default?.default ?? module.default ?? module;
 
     if (typeof completer !== 'object' || !completer.name || completer.disabled) return false;
-    if (!reload && this.client.autocomplete.has(completer.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'autocomplete', completer.id);
+    if (!reload && this.client.autocompleters.has(completer.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'autocomplete', completer.id);
 
     completer.filepath = filepath;
-    this.client.autocomplete.set(completer.id, completer);
+    this.client.autocompleters.set(completer.id, completer);
     return true;
   }
 
   async loadAll() {
-    const listenerDirs = path.resolve(this.client.rootDir, 'autocomplete');
-    const files = await listFiles(listenerDirs);
+    const files = await listFiles(this.client.autocompletersDir);
 
     for (const file of files) {
       try {
-        await this.load(path.resolve(file));
+        await this.load(resolvePath(file));
       } catch (error) {
         this.client.emit('error', new FrameworkError('ComponentLoadError', 'autocomplete', error));
       }
@@ -49,7 +46,7 @@ export default class AutocompleteModule extends EventEmitter {
   }
 
   async reload(id: string) {
-    const completer = this.client.autocomplete.get(id);
+    const completer = this.client.autocompleters.get(id);
     if (!completer) throw new FrameworkError('UnknownComponent', 'autocomplete', id);
 
     this.unload(id, true);
@@ -57,11 +54,11 @@ export default class AutocompleteModule extends EventEmitter {
   }
 
   private unload(id: string, reload: boolean = false) {
-    if (!this.client.autocomplete.has(id)) throw new FrameworkError('UnknownComponent', 'autocomplete', id);
-    const completer = this.client.autocomplete.get(id)!;
+    if (!this.client.autocompleters.has(id)) throw new FrameworkError('UnknownComponent', 'autocomplete', id);
+    const completer = this.client.autocompleters.get(id)!;
 
     delete require.cache[require.resolve(completer.filepath)];
-    if (!reload) this.client.autocomplete.delete(id);
+    if (!reload) this.client.autocompleters.delete(id);
   }
 
 
@@ -70,29 +67,32 @@ export default class AutocompleteModule extends EventEmitter {
 
     const option = interaction.options.getFocused(true);
     const command = this.client.commands.get(`Slash:${interaction.commandName}`);
-    const completer = this.client.autocomplete.get(option.name);
+    const completer = this.client.autocompleters.get(option.name);
 
-    if (!option || !command || command.commandType !== 'Slash') {
+    if (!command || command.commandType !== 'Slash') {
       this.emit('unknown', interaction);
       return;
     }
-    
-    if (completer && !completer.disabled) {
+
+    if (!interaction.inCachedGuild()) return;
+    const allowed = !completer?.commands?.length || completer.commands.includes(command.name);
+
+    if (completer && !completer.disabled && allowed) {
       try {
         this.emit('execute', { interaction, command, completer });
         await completer.execute(this.client, interaction, command, option.value);
         this.emit('success', { interaction, command, completer });
       } catch (error) {
-        this.emit('success', { interaction, command, completer, error });
+        this.emit('error', { interaction, command, completer, error });
       }
-    } 
+    }
     else if (typeof command.autocomplete === 'function' && !command.disabled) {
       try {
         this.emit('execute', { interaction, command, completer });
         await command.autocomplete(this.client, interaction);
         this.emit('success', { interaction, command, completer });
       } catch (error) {
-        this.emit('success', { interaction, command, completer, error });
+        this.emit('error', { interaction, command, completer, error });
       }
     }
     else {
@@ -104,7 +104,7 @@ export default class AutocompleteModule extends EventEmitter {
 
 /**
  * Emitted when a completer is executed
- * @event AutocompleteModule#execute
+ * @event AutocompletersModule#execute
  * @param {FrameworkSlashCommand} context.command The command
  * @param {FrameworkAutocompleter} context.completer The autocompleter
  * @param {AutocompleteInteraction} context.interaction The autocomplete interaction
@@ -112,7 +112,7 @@ export default class AutocompleteModule extends EventEmitter {
 
 /**
  * Emitted when a completer finishes execution successfully
- * @event AutocompleteModule#execute
+ * @event AutocompletersModule#success
  * @param {FrameworkSlashCommand} context.command The command
  * @param {FrameworkAutocompleter} context.completer The autocompleter
  * @param {AutocompleteInteraction} context.interaction The autocomplete interaction
@@ -120,7 +120,7 @@ export default class AutocompleteModule extends EventEmitter {
 
 /**
  * Emitted when a completer throws an error
- * @event AutocompleteModule#error
+ * @event AutocompletersModule#error
  * @param {FrameworkSlashCommand} context.command The command
  * @param {FrameworkAutocompleter} context.completer The autocompleter
  * @param {AutocompleteInteraction} context.interaction The autocomplete interaction
@@ -129,6 +129,6 @@ export default class AutocompleteModule extends EventEmitter {
 
 /**
  * Emitted when an interaction arrives with a completer that is not loaded
- * @event AutocompleteModule#unknown
+ * @event AutocompletersModule#unknown
  * @param {AutocompleteInteraction} interaction The interaction
  */

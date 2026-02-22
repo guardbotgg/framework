@@ -1,5 +1,5 @@
-import { FrameworkError, FrameworkTypeError } from '../utils/errors';
-import { ListenerOptions } from '../types';
+import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
+import { ListenerOptions } from '../../types';
 import { ClientEvents } from 'discord.js';
 
 

@@ -1,32 +1,23 @@
-![Framework](https://raw.githubusercontent.com/guardbotgg/.github/master/assets/framework.png)
-
-<br/>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/guardbotgg/assets/master/made-with-typescript.svg" alt="badge" />
-  <img src="https://raw.githubusercontent.com/guardbotgg/assets/master/made-with-love.svg" alt="badge" />
-</p>
-<br/>
-
 # @guardbot/framework
 > **A simple framework made for building discord bots with discord.js.**
 
-## **📦 Installation**
-```sh
+<div>
+  <img src="https://raw.githubusercontent.com/guardbotgg/assets/master/made-with-typescript.svg" alt="badge" />
+  <img src="https://raw.githubusercontent.com/guardbotgg/assets/master/made-with-love.svg" alt="badge" />
+</div >
+
+
+## 📦 Installation
+```bash
 $ npm install @guardbot/framework # via npm
-$ yarn add @guardbot/framework # yarn
-$ pnpm add @guardbot/framework # pnpm
+$ yarn add @guardbot/framework    # via yarn
+$ pnpm add @guardbot/framework    # via pnpm
 ```
 
-## **✨ Features**
-- Easy to use.
-- Beginner friendly.
-- Supports Intellisense.
-
-## **🪴 Quick Start**
+## 🪴 Getting Started
 
 ### 1. Initialize the Client
 Create your main entry file (e.g., `index.ts`) and initialize the `FrameworkClient`.
-
 ```typescript
 import { FrameworkClient } from '@guardbot/framework';
 import { GatewayIntentBits } from 'discord.js';
@@ -40,9 +31,10 @@ const client = new FrameworkClient({
       GatewayIntentBits.MessageContent
     ]
   },
+  prefix: '!', 
   rootDir: path.join(__dirname),
   registerOnStart: true, 
-  prefix: '!', 
+  guildsToRegister: [],
 });
 
 client.login('DISCORD_BOT_TOKEN');
@@ -50,7 +42,6 @@ client.login('DISCORD_BOT_TOKEN');
 
 ### 2. Create a Slash Command
 Create a file in your commands directory (e.g., `src/commands/general/ping.ts`).
-
 ```typescript
 import { SlashCommand } from '@guardbot/framework';
 
@@ -67,8 +58,7 @@ export default SlashCommand({
 ```
 
 ### 3. Create a Message Command
-Create a file for prefix-based commands (e.g., `src/commands/general/ping.ts`).
-
+Create a file for prefix-based commands (e.g., `src/commands/legacy/ping.ts`).
 ```typescript
 import { MessageCommand } from '@guardbot/framework';
 
@@ -86,7 +76,6 @@ export default MessageCommand({
 
 ### 4. Create an Event Listener
 Create an event file (e.g., `src/listeners/client/ready.ts`).
-
 ```typescript
 import { Listener } from '@guardbot/framework';
 
@@ -97,10 +86,24 @@ export default Listener({
   async execute(client) {
     console.log(`Logged in as ${client.user.tag}!`);
     console.log(`Loaded ${client.commands.size} commands.`);
-    return true;
   }
 })
 ```
 
-## **🎐 Support Server**
-<a href="https://discord.gg/invite/GaczkwfgV9"><img src="https://invidget.switchblade.xyz/GaczkwfgV9" alt="Discord"></a>
+### 5. Recommended Project Structure
+```bash
+src/
+├─ commands/
+│  └─ general/
+│     └─ ping.ts
+├─ listeners/
+│  └─ client/
+│     └─ ready.ts
+└─ index.ts
+```
+
+
+## 🪴 Support Server
+<a href="https://discord.gg/invite/GaczkwfgV9" target="_blank">
+  <img src="https://discordwidgets.vercel.app/widgets/invite/GaczkwfgV9?theme=dark" alt="Invite" />
+</a>

@@ -1,21 +1,16 @@
+import { ContextCommandOptions, CommandTypes, CommandScopes, CommandContexts, IntegrationTypes } from '../../types';
 import { ApplicationIntegrationType, InteractionContextType } from 'discord.js';
-import { FrameworkError, FrameworkTypeError } from '../utils/errors';
-import { ContextCommandOptions } from '../types';
-import { Command } from './Command';
-
-const CommandScope = ['default', 'guild', 'global'];
-const CommandTypes = ['ContextUser', 'ContextMessage'];
-const CommandContexts = ['Guild', 'BotDM', 'PrivateChannel', 0, 1, 2];
-const IntegrationTypes = ['GuildInstall', 'UserInstall', 0, 1];
+import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
+import { BaseCommand } from './BaseCommand';
 
 
 export function ContextCommand(options: ContextCommandOptions) {
 
   if (!options.commandType) throw new FrameworkError('InvalidOption', 'commandType');
-  if (typeof options.commandScope !== 'string' || !CommandTypes.includes(options.commandType)) throw new FrameworkError('InvalidValue', 'commandType', CommandTypes);
+  if (options.commandType !== CommandTypes[2] && options.commandType !== CommandTypes[3]) throw new FrameworkError('InvalidValue', 'commandType', CommandTypes);
 
   if (!options.commandScope) throw new FrameworkError('InvalidOption', 'commandScope');
-  if (typeof options.commandScope !== 'string' || !CommandScope.includes(options.commandScope)) throw new FrameworkError('InvalidValue', 'commandScope', CommandScope);
+  if (typeof options.commandScope !== 'string' || !CommandScopes.includes(options.commandScope)) throw new FrameworkError('InvalidValue', 'commandScope', CommandScopes);
 
   if (options.commandContexts && !Array.isArray(options.commandContexts)) throw new FrameworkTypeError('InvalidType', 'commandContexts', 'Array', typeof options.commandContexts);
   if (options.commandContexts && options.commandContexts.some(c => !CommandContexts.includes(c))) throw new FrameworkError('InvalidValues', 'commandContexts', CommandContexts);
@@ -26,11 +21,12 @@ export function ContextCommand(options: ContextCommandOptions) {
   if (!options.execute) throw new FrameworkError('InvalidOption', 'execute');
   if (typeof options.execute !== 'function') throw new FrameworkTypeError('InvalidType', 'execute', 'function', typeof options.execute);
 
-  if (!options.commandContexts) options.commandContexts = [InteractionContextType.Guild];
-  if (!options.integrationTypes) options.integrationTypes = [ApplicationIntegrationType.GuildInstall];
+  if (!options.commandContexts || !options.commandContexts.length) options.commandContexts = [InteractionContextType.Guild];
+  if (!options.integrationTypes || !options.integrationTypes.length) options.integrationTypes = [ApplicationIntegrationType.GuildInstall];
 
-  return Command({
+  return BaseCommand({
     ...options,
     commandType: options.commandType,
+    description: options.description ?? 'no description',
   });
 }

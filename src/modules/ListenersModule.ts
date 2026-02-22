@@ -1,9 +1,7 @@
-import FrameworkClient from '../FrameworkClient';
-import { FrameworkError } from '../utils/errors';
+import { listFiles, pathToFileURL, resolvePath } from '../utils';
+import { FrameworkClient } from '../core/FrameworkClient';
+import { FrameworkError } from '../core/FrameworkError';
 import { FrameworkListener } from '../types';
-import { listFiles } from '../utils/utils';
-import { pathToFileURL } from 'node:url';
-import path from 'path';
 
 
 export default class ListenerModule {
@@ -13,8 +11,8 @@ export default class ListenerModule {
   }
 
   async load(filepath: string, reload: boolean = false) {
-    const listenerModule = reload ? require(filepath) : await import(pathToFileURL(filepath).href);
-    const listener: FrameworkListener = listenerModule.listener ?? listenerModule.default?.default ?? listenerModule.default ?? listenerModule;
+    const module = await import(pathToFileURL(filepath).href  + `?update=${Date.now()}`);
+    const listener: FrameworkListener = module?.listener ?? module?.default?.default ?? module?.default ?? module;
 
     if (typeof listener !== 'object' || !listener.name || listener.disabled) return false;
     if (!reload && this.client.events.has(listener.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'listener', listener.id);
@@ -28,12 +26,11 @@ export default class ListenerModule {
   }
 
   async loadAll() {
-    const listenerDirs = path.resolve(this.client.rootDir, 'listeners');
-    const files = await listFiles(listenerDirs);
+    const files = await listFiles(this.client.listenersDir);
 
     for (const file of files) {
       try {
-        await this.load(path.resolve(file));
+        await this.load(resolvePath(file));
       } catch (error) {
         this.client.emit('error', new FrameworkError('ComponentLoadError', 'listener', error));
       }

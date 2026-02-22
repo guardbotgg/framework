@@ -1,20 +1,29 @@
 {
   "compilerOptions": {
-    "target": "ES2022", 
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "module": "ESNext",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
+    "moduleResolution": "Bundler",
+
+    "rootDir": "./src",
+    "outDir": "./build",
+
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": false,
+    "sourceMap": true,
+
     "strict": true,
     "noImplicitAny": true,
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "forceConsistentCasingInFileNames": true, 
-    "sourceMap": false,
-    "outDir": "./build",
-    "rootDir": "./src",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+
+    "removeComments": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "build"]
+  "include": ["src"],
+  "exclude": ["node_modules", "build", "tests"]
 }
