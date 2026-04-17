@@ -1,19 +1,12 @@
+import { AutocompleterEvents, FrameworkAutocompleter } from '../types';
 import { listFiles, pathToFileURL, resolvePath } from '../utils';
-import { FrameworkError } from '../core/FrameworkError';
 import { FrameworkClient } from '../core/FrameworkClient';
-import { FrameworkAutocompleter } from '../types';
+import { FrameworkError } from '../core/FrameworkError';
+import { TypedEmitter } from 'tiny-typed-emitter';
 import { Interaction } from 'discord.js';
-import EventEmitter from 'events';
 
 
-/**
- * @class AutocompletersModule
- * @fires AutocompletersModule#execute
- * @fires AutocompletersModule#success
- * @fires AutocompletersModule#error
- * @fires AutocompletersModule#unknown
- */
-export default class AutocompletersModule extends EventEmitter {
+export default class AutocompletersModule extends TypedEmitter<AutocompleterEvents> {
   private client: FrameworkClient<true>;
   constructor(client: FrameworkClient) {
     super();
@@ -79,20 +72,20 @@ export default class AutocompletersModule extends EventEmitter {
 
     if (completer && !completer.disabled && allowed) {
       try {
-        this.emit('execute', { interaction, command, completer });
+        this.emit('execute', command, interaction, completer);
         await completer.execute(this.client, interaction, command, option.value);
-        this.emit('success', { interaction, command, completer });
+        this.emit('success', command, interaction, completer);
       } catch (error) {
-        this.emit('error', { interaction, command, completer, error });
+        this.emit('error', command, interaction, completer, error);
       }
     }
     else if (typeof command.autocomplete === 'function' && !command.disabled) {
       try {
-        this.emit('execute', { interaction, command, completer });
+        this.emit('execute', command, interaction, completer);
         await command.autocomplete(this.client, interaction);
-        this.emit('success', { interaction, command, completer });
+        this.emit('success', command, interaction, completer);
       } catch (error) {
-        this.emit('error', { interaction, command, completer, error });
+        this.emit('error', command, interaction, completer, error);
       }
     }
     else {
@@ -100,35 +93,3 @@ export default class AutocompletersModule extends EventEmitter {
     }
   }
 }
-
-
-/**
- * Emitted when a completer is executed
- * @event AutocompletersModule#execute
- * @param {FrameworkSlashCommand} context.command The command
- * @param {FrameworkAutocompleter} context.completer The autocompleter
- * @param {AutocompleteInteraction} context.interaction The autocomplete interaction
- */
-
-/**
- * Emitted when a completer finishes execution successfully
- * @event AutocompletersModule#success
- * @param {FrameworkSlashCommand} context.command The command
- * @param {FrameworkAutocompleter} context.completer The autocompleter
- * @param {AutocompleteInteraction} context.interaction The autocomplete interaction
- */
-
-/**
- * Emitted when a completer throws an error
- * @event AutocompletersModule#error
- * @param {FrameworkSlashCommand} context.command The command
- * @param {FrameworkAutocompleter} context.completer The autocompleter
- * @param {AutocompleteInteraction} context.interaction The autocomplete interaction
- * @param {Error} context.error The error
- */
-
-/**
- * Emitted when an interaction arrives with a completer that is not loaded
- * @event AutocompletersModule#unknown
- * @param {AutocompleteInteraction} interaction The interaction
- */

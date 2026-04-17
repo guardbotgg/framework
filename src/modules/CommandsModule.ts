@@ -1,19 +1,12 @@
 import { listFiles, resolveCommandContexts, resolveIntegrationTypes, unixTimestamp, createPrefixRegex, pathToFileURL, resolvePath, resolvePermissions, formatPermissions } from '../utils';
-import { FrameworkCommand, FrameworkSlashCommand, FrameworkContextCommand, CommandCustomHandlers, CommandMiddleware } from '../types';
+import { FrameworkCommand, FrameworkSlashCommand, FrameworkContextCommand, CommandCustomHandlers, CommandMiddleware, CommandEvents } from '../types';
 import { ApplicationCommandType, Collection, Interaction, Message, MessageFlags } from 'discord.js';
 import { FrameworkClient } from '../core/FrameworkClient';
 import { FrameworkError } from '../core/FrameworkError';
-import EventEmitter from 'events';
+import { TypedEmitter } from 'tiny-typed-emitter';
 
 
-/**
- * @class CommandsModule
- * @fires CommandsModule#execute
- * @fires CommandsModule#success
- * @fires CommandsModule#error
- * @fires CommandsModule#unknown
- */
-export default class CommandsModule extends EventEmitter {
+export default class CommandsModule extends TypedEmitter<CommandEvents> {
   private client: FrameworkClient<true>;
   private handlers: CommandCustomHandlers = {};
   private middleware?: CommandMiddleware;
@@ -183,16 +176,16 @@ export default class CommandsModule extends EventEmitter {
 
 
     try {
-      this.emit('execute', { context: message, command });
+      this.emit('execute', command, message);
       if (message.inGuild() && command.contexts.includes('Guild')) { 
         await command.execute(this.client, message, args);
       } 
       else if (!message.inGuild() && command.contexts.includes('BotDM')) {
         await command.execute(this.client, message as any, args);
       }
-      this.emit('success', { context: message, command });
+      this.emit('success', command, message);
     } catch (error) {
-      this.emit('error', { context: message, command, error });
+      this.emit('error', command, message, error);
     }
   }
 
@@ -246,11 +239,11 @@ export default class CommandsModule extends EventEmitter {
 
 
     try {
-      this.emit('execute', { context: interaction, command });
+      this.emit('execute', command, interaction);
       await command.execute(this.client, interaction as any);
-      this.emit('success', { context: interaction, command });
+      this.emit('success', command, interaction);
     } catch (error) {
-      this.emit('error', { context: interaction, command, error });
+      this.emit('error', command, interaction, error);
     }
   }
 
@@ -292,32 +285,3 @@ export default class CommandsModule extends EventEmitter {
     };
   }  
 }
-
-
-/**
- * Emitted when a command is executed
- * @event CommandsModule#execute
- * @param {FrameworkCommand} context.command The command
- * @param {Message|CommandInteraction} context.context The interaction / message
- */
-
-/**
- * Emitted when a command finishes execution successfully
- * @event CommandsModule#success
- * @param {FrameworkCommand} context.command The command
- * @param {Message|CommandInteraction} context.context The interaction / message
- */
-
-/**
- * Emitted when a command throws an error
- * @event CommandsModule#error
- * @param {FrameworkCommand} context.command The command
- * @param {Message|CommandInteraction} context.context The interaction / message
- * @param {any} context.error The error
- */
-
-/**
- * Emitted when an interaction arrives with a command that is not loaded
- * @event CommandsModule#unknown
- * @param {CommandInteraction} interaction The interaction
- */

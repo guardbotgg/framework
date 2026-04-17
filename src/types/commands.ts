@@ -145,3 +145,15 @@ export interface CommandCustomHandlers {
   onMemberPermissions?: (context: Message, command: FrameworkCommand, missingPermissions: PermissionsString[]) => any;
   onClientPermissions?: (context: Message | CommandInteraction, command: FrameworkCommand, missingPermissions: PermissionsString[]) => any;
 }
+
+
+export interface CommandEvents {
+  /** Fired when a command starts execution */
+  execute: (command: FrameworkCommand, context: Message | CommandInteraction) => void;
+  /** Fired when a command finishes successfully */
+  success: (command: FrameworkCommand, context: Message | CommandInteraction) => void;
+  /** Fired when a command throws an error */
+  error: (command: FrameworkCommand, context: Message | CommandInteraction, error: unknown) => void;
+  /** Fired when no matching command is found */
+  unknown: (interaction: CommandInteraction) => void;
+}

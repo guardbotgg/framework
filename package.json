@@ -1,6 +1,6 @@
 {
   "name": "@guardbot/framework",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A simple framework made for building discord bots with discord.js.",
   "type": "module",
   "main": "./build/index.cjs",
@@ -10,7 +10,8 @@
     ".": {
       "types": "./build/index.d.ts",
       "import": "./build/index.js",
-      "require": "./build/index.cjs"
+      "require": "./build/index.cjs",
+      "default": "./build/index.js"
     }
   },
   "files": [
@@ -25,6 +26,7 @@
   "publishConfig": {
     "access": "public"
   },
+  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/guardbotgg/framework.git"
@@ -40,15 +42,22 @@
   "bugs": {
     "url": "https://github.com/guardbotgg/framework/issues"
   },
+
   "peerDependencies": {
-    "discord.js": "^14"
+    "discord.js": "^14.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "discord.js": "^14",
-    "rimraf": "^5.0.5",
+    "discord.js": "^14.0.0",
     "dotenv": "^17.3.1",
+    "rimraf": "^5.0.5",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "tiny-typed-emitter": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
