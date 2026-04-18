@@ -4,7 +4,7 @@ export { ContextCommand } from './builders/commands/ContextCommand';
 export { MessageCommand } from './builders/commands/MessageCommand';
 export { SlashCommand } from './builders/commands/SlashCommand';
 export { Listener } from './builders/listeners/Listener';
-import './extensions';
+import {} from './extensions';
 
 
 export type {
