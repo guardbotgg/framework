@@ -1,6 +1,6 @@
 {
   "name": "@guardbot/framework",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "A simple framework made for building discord bots with discord.js.",
   "type": "module",
   "main": "./build/index.cjs",
@@ -26,7 +26,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/guardbotgg/framework.git"

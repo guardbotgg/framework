@@ -60,7 +60,7 @@ export default class AutocompletersModule extends TypedEmitter<AutocompleterEven
 
     const option = interaction.options.getFocused(true);
     const command = this.client.commands.get(`Slash:${interaction.commandName}`);
-    const completer = this.client.autocompleters.get(option.name);
+    const autocompleter = this.client.autocompleters.get(option.name);
 
     if (!command || command.commandType !== 'Slash') {
       this.emit('unknown', interaction);
@@ -68,24 +68,24 @@ export default class AutocompletersModule extends TypedEmitter<AutocompleterEven
     }
 
     if (!interaction.inCachedGuild()) return;
-    const allowed = !completer?.commands?.length || completer.commands.includes(command.name);
+    const allowed = !autocompleter?.commands?.length || autocompleter.commands.includes(command.name);
 
-    if (completer && !completer.disabled && allowed) {
+    if (autocompleter && !autocompleter.disabled && allowed) {
       try {
-        this.emit('execute', command, interaction, completer);
-        await completer.execute(this.client, interaction, command, option.value);
-        this.emit('success', command, interaction, completer);
+        this.emit('execute', { command, interaction, autocompleter });
+        await autocompleter.execute(this.client, interaction, command, option.value);
+        this.emit('success', { command, interaction, autocompleter });
       } catch (error) {
-        this.emit('error', command, interaction, completer, error);
+        this.emit('error', { command, interaction, autocompleter, error });
       }
     }
     else if (typeof command.autocomplete === 'function' && !command.disabled) {
       try {
-        this.emit('execute', command, interaction, completer);
+        this.emit('execute', { command, interaction, autocompleter });
         await command.autocomplete(this.client, interaction);
-        this.emit('success', command, interaction, completer);
+        this.emit('success', { command, interaction, autocompleter });
       } catch (error) {
-        this.emit('error', command, interaction, completer, error);
+        this.emit('error', { command, interaction, autocompleter, error });
       }
     }
     else {

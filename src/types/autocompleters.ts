@@ -34,11 +34,11 @@ export interface FrameworkAutocompleter extends BaseAutocompleterMeta {
 
 export interface AutocompleterEvents {
   /** Fired when an autocompleter starts execution */
-  execute: (command: FrameworkSlashCommand, interaction: AutocompleteInteraction, autocompleter: FrameworkAutocompleter | undefined) => void;
+  execute: (context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined }) => void;
   /** Fired when execution completes successfully */
-  success: (command: FrameworkSlashCommand, interaction: AutocompleteInteraction, autocompleter: FrameworkAutocompleter | undefined) => void;
+  success: (context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined }) => void;
   /** Fired when execution throws an error */
-  error: (command: FrameworkSlashCommand, interaction: AutocompleteInteraction, autocompleter: FrameworkAutocompleter | undefined, error: unknown) => void;
+  error: (context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined; error: unknown }) => void;
   /** Fired when no matching autocompleter is found */
   unknown: (interaction: AutocompleteInteraction) => void;
 }

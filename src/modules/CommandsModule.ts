@@ -176,16 +176,16 @@ export default class CommandsModule extends TypedEmitter<CommandEvents> {
 
 
     try {
-      this.emit('execute', command, message);
+      this.emit('execute', { command, context: message });
       if (message.inGuild() && command.contexts.includes('Guild')) { 
         await command.execute(this.client, message, args);
       } 
       else if (!message.inGuild() && command.contexts.includes('BotDM')) {
         await command.execute(this.client, message as any, args);
       }
-      this.emit('success', command, message);
+      this.emit('success', { command, context: message });
     } catch (error) {
-      this.emit('error', command, message, error);
+      this.emit('error', { command, context: message, error });
     }
   }
 
@@ -239,11 +239,11 @@ export default class CommandsModule extends TypedEmitter<CommandEvents> {
 
 
     try {
-      this.emit('execute', command, interaction);
+      this.emit('execute', { command, context: interaction });
       await command.execute(this.client, interaction as any);
-      this.emit('success', command, interaction);
+      this.emit('success', { command, context: interaction });
     } catch (error) {
-      this.emit('error', command, interaction, error);
+      this.emit('error', { command, context: interaction, error });
     }
   }
 

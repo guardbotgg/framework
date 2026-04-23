@@ -149,11 +149,11 @@ export interface CommandCustomHandlers {
 
 export interface CommandEvents {
   /** Fired when a command starts execution */
-  execute: (command: FrameworkCommand, context: Message | CommandInteraction) => void;
+  execute: (context: { command: FrameworkCommand; context: Message | CommandInteraction }) => void;
   /** Fired when a command finishes successfully */
-  success: (command: FrameworkCommand, context: Message | CommandInteraction) => void;
+  success: (context: { command: FrameworkCommand; context: Message | CommandInteraction }) => void;
   /** Fired when a command throws an error */
-  error: (command: FrameworkCommand, context: Message | CommandInteraction, error: unknown) => void;
+  error: (context: { command: FrameworkCommand; context: Message | CommandInteraction; error: unknown }) => void;
   /** Fired when no matching command is found */
   unknown: (interaction: CommandInteraction) => void;
 }
