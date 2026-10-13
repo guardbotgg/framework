@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & help
+    url: https://discord.gg/invite/GaczkwfgV9
+    about: Ask questions about using the framework in the support server.
+  - name: Report a security vulnerability
+    url: https://github.com/guardbotgg/framework/security/advisories/new
+    about: Report vulnerabilities privately, not in a public issue.

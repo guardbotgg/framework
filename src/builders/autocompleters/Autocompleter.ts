@@ -1,25 +1,25 @@
-import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
-import { AutocompleterOptions } from '../../types';
+import { normalizeCommandName, validateArray, validateOptions, validateRequired, validateType, withKind } from '../../utils';
+import { AutocompleterOptions, FrameworkAutocompleter } from '../../types';
 
 
-export function Autocompleter(options: AutocompleterOptions) {
-  
-  if (!options) throw new FrameworkError('NoOptions');
-  if (typeof options !== 'object') throw new FrameworkTypeError('InvalidType', 'options', 'object', typeof options);
-  
-  if (!options.name || !options.name?.length) throw new FrameworkError('InvalidOption', 'name');
-  if (typeof options.name !== 'string') throw new FrameworkTypeError('InvalidType', 'name', 'string', typeof options.name);
+export function Autocompleter<const G extends boolean = true>(options: AutocompleterOptions<G>): FrameworkAutocompleter<G> {
+  validateOptions(options);
+  validateRequired(options.name, 'name');
+  validateType(options.name, 'name', 'string');
+  validateRequired(options.execute, 'execute');
+  validateType(options.execute, 'execute', 'function');
+  validateArray(options.commands, 'commands', { type: 'string' });
+  validateType(options.guildOnly, 'guildOnly', 'boolean');
+  validateType(options.disabled, 'disabled', 'boolean');
 
-  if (!options.execute) throw new FrameworkError('InvalidOption', 'execute');
-  if (typeof options.execute !== 'function') throw new FrameworkTypeError('InvalidType', 'execute', 'function', typeof options.execute);
-  
-  if (options.commands && !Array.isArray(options.commands)) throw new FrameworkTypeError('InvalidType', 'commands', 'string[]', typeof options.commands);
-  if (options.disabled !== undefined && typeof options.disabled !== 'boolean') throw new FrameworkTypeError('InvalidType', 'disabled', 'boolean', typeof options.disabled);
-
-  return {
-    id: options.name,
+  const commands = options.commands?.map(name => normalizeCommandName(name, 'Slash'));
+  return withKind('autocompleter', {
+    id: commands?.length ? `${commands.join('|')}:${options.name}` : options.name,
     name: options.name,
+    filepath: '',
     disabled: options.disabled ?? false,
+    guildOnly: (options.guildOnly ?? true) as G,
+    commands,
     execute: options.execute,
-  }
+  });
 }

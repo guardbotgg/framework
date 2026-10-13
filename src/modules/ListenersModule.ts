@@ -1,56 +1,37 @@
-import { listFiles, pathToFileURL, resolvePath } from '../utils';
-import { FrameworkClient } from '../core/FrameworkClient';
-import { FrameworkError } from '../core/FrameworkError';
 import { FrameworkListener } from '../types';
+import { emitClientError } from '../utils';
+import { ClientEvents } from 'discord.js';
+import BaseModule from './BaseModule';
 
 
-export default class ListenerModule {
-  private client: FrameworkClient<true>;
-  constructor(client: FrameworkClient) {
-    this.client = client as FrameworkClient<true>;
-  }
+type Handler = (...args: ClientEvents[keyof ClientEvents]) => Promise<unknown>;
 
-  async load(filepath: string, reload: boolean = false) {
-    const module = await import(pathToFileURL(filepath).href  + `?update=${Date.now()}`);
-    const listener: FrameworkListener = module?.listener ?? module?.default?.default ?? module?.default ?? module;
+export default class ListenersModule extends BaseModule<FrameworkListener> {
+  protected readonly label = 'listener';
+  private handlers = new WeakMap<FrameworkListener, Handler>();
 
-    if (typeof listener !== 'object' || !listener.name || listener.disabled) return false;
-    if (!reload && this.client.events.has(listener.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'listener', listener.id);
+  protected get directory() { return this.client.listenersDir; }
+  public get collection() { return this.client.events; }
 
-    listener.filepath = filepath;
-    listener._execute = (...args) => listener.execute(...args);
-    
-    this.client[listener.once ? 'once' : 'on'](listener.name, listener._execute);
-    this.client.events.set(listener.id, listener);
-    return true;
-  }
-
-  async loadAll() {
-    const files = await listFiles(this.client.listenersDir);
-
-    for (const file of files) {
+  protected override register(listener: FrameworkListener) {
+    const handler: Handler = async (...args) => {
       try {
-        await this.load(resolvePath(file));
+        return await listener.execute(...args);
       } catch (error) {
-        this.client.emit('error', new FrameworkError('ComponentLoadError', 'listener', error));
+        if (listener.name === 'error') console.error(error);
+        else emitClientError(this.client, error);
       }
-    }
+    };
+
+    this.handlers.set(listener, handler);
+    this.client[listener.once ? 'once' : 'on'](listener.name, handler);
+    super.register(listener);
   }
 
-  async reload(id: string) {
-    if (!this.client.events.has(id)) throw new FrameworkError('UnknownComponent', 'listener', id);
-    const listener = this.client.events.get(id)!;
-
-    this.unload(id, true);
-    await this.load(listener.filepath, true);
-  }
-
-  private unload(id: string, reload: boolean = false) {
-    if (!this.client.events.has(id)) throw new FrameworkError('UnknownComponent', 'listener', id);
-    const listener = this.client.events.get(id)!;
-
-    if (listener._execute) this.client.off(listener.name, listener._execute);
-    delete require.cache[require.resolve(listener.filepath)];
-    if (!reload) this.client.events.delete(id);
+  protected override unregister(listener: FrameworkListener) {
+    const handler = this.handlers.get(listener);
+    if (handler) this.client.off(listener.name, handler);
+    this.handlers.delete(listener);
+    super.unregister(listener);
   }
 }

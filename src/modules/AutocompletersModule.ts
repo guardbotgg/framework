@@ -1,95 +1,48 @@
-import { AutocompleterEvents, FrameworkAutocompleter } from '../types';
-import { listFiles, pathToFileURL, resolvePath } from '../utils';
+import { AutocompleterEvents, FrameworkAutocompleter, RegisteredClient } from '../types';
+import { emitClientError, requiresCachedGuild } from '../utils';
 import { FrameworkClient } from '../core/FrameworkClient';
-import { FrameworkError } from '../core/FrameworkError';
-import { TypedEmitter } from 'tiny-typed-emitter';
 import { Interaction } from 'discord.js';
+import BaseModule from './BaseModule';
 
 
-export default class AutocompletersModule extends TypedEmitter<AutocompleterEvents> {
-  private client: FrameworkClient<true>;
+export default class AutocompletersModule extends BaseModule<FrameworkAutocompleter, AutocompleterEvents> {
+  protected readonly label = 'autocompleter';
+
+  protected get directory() { return this.client.autocompletersDir; }
+  public get collection() { return this.client.autocompleters; }
+
   constructor(client: FrameworkClient) {
-    super();
-    this.client = client as FrameworkClient<true>;
-    this.client.on('interactionCreate', (interaction) => this._handleInteraction(interaction));
+    super(client);
+    this.client.on('interactionCreate', (interaction) => this.handleInteraction(interaction).catch(error => emitClientError(this.client, error)));
   }
 
-  async load(filepath: string, reload: boolean = false) {
-    const module = await import(pathToFileURL(filepath).href  + `?update=${Date.now()}`);
-    const completer: FrameworkAutocompleter = module.autocomplete ?? module.default?.default ?? module.default ?? module;
-
-    if (typeof completer !== 'object' || !completer.name || completer.disabled) return false;
-    if (!reload && this.client.autocompleters.has(completer.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'autocomplete', completer.id);
-
-    completer.filepath = filepath;
-    this.client.autocompleters.set(completer.id, completer);
-    return true;
-  }
-
-  async loadAll() {
-    const files = await listFiles(this.client.autocompletersDir);
-
-    for (const file of files) {
-      try {
-        await this.load(resolvePath(file));
-      } catch (error) {
-        this.client.emit('error', new FrameworkError('ComponentLoadError', 'autocomplete', error));
-      }
+  find(optionName: string, commandName: string): FrameworkAutocompleter | undefined {
+    let fallback: FrameworkAutocompleter | undefined;
+    for (const autocompleter of this.collection.values()) {
+      if (autocompleter.disabled || autocompleter.name !== optionName) continue;
+      if (!autocompleter.commands?.length) fallback ??= autocompleter;
+      else if (autocompleter.commands.includes(commandName)) return autocompleter;
     }
-  }
-
-  async reload(id: string) {
-    const completer = this.client.autocompleters.get(id);
-    if (!completer) throw new FrameworkError('UnknownComponent', 'autocomplete', id);
-
-    this.unload(id, true);
-    await this.load(completer.filepath, true);
-  }
-
-  private unload(id: string, reload: boolean = false) {
-    if (!this.client.autocompleters.has(id)) throw new FrameworkError('UnknownComponent', 'autocomplete', id);
-    const completer = this.client.autocompleters.get(id)!;
-
-    delete require.cache[require.resolve(completer.filepath)];
-    if (!reload) this.client.autocompleters.delete(id);
+    return fallback;
   }
 
 
-  private async _handleInteraction(interaction: Interaction) {
+  private async handleInteraction(interaction: Interaction) {
     if (!interaction.isAutocomplete()) return;
 
     const option = interaction.options.getFocused(true);
     const command = this.client.commands.get(`Slash:${interaction.commandName}`);
-    const autocompleter = this.client.autocompleters.get(option.name);
+    if (!command || command.commandType !== 'Slash' || command.disabled) return this.emitSafely('unknown', interaction);
 
-    if (!command || command.commandType !== 'Slash') {
-      this.emit('unknown', interaction);
-      return;
-    }
+    const autocompleter = this.find(option.name, command.name);
+    if (!autocompleter && typeof command.autocomplete !== 'function') return this.emitSafely('unknown', interaction);
 
-    if (!interaction.inCachedGuild()) return;
-    const allowed = !autocompleter?.commands?.length || autocompleter.commands.includes(command.name);
+    const guildOnly = autocompleter ? autocompleter.guildOnly : requiresCachedGuild(command);
+    if (guildOnly && !interaction.inCachedGuild()) return;
 
-    if (autocompleter && !autocompleter.disabled && allowed) {
-      try {
-        this.emit('execute', { command, interaction, autocompleter });
-        await autocompleter.execute(this.client, interaction, command, option.value);
-        this.emit('success', { command, interaction, autocompleter });
-      } catch (error) {
-        this.emit('error', { command, interaction, autocompleter, error });
-      }
-    }
-    else if (typeof command.autocomplete === 'function' && !command.disabled) {
-      try {
-        this.emit('execute', { command, interaction, autocompleter });
-        await command.autocomplete(this.client, interaction);
-        this.emit('success', { command, interaction, autocompleter });
-      } catch (error) {
-        this.emit('error', { command, interaction, autocompleter, error });
-      }
-    }
-    else {
-      this.emit('unknown', interaction);
-    }
+    await this.runHandler({ command, interaction, autocompleter }, () => (autocompleter
+      ? autocompleter.execute(this.client as RegisteredClient, interaction as never, command, option.value)
+      : command.autocomplete!(this.client as RegisteredClient, interaction as never)
+    ));
   }
 }

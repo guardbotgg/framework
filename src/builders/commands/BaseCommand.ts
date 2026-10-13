@@ -1,41 +1,39 @@
-import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
-import { isPermissionResolvable, normalizeCommandName } from '../../utils';
-import { BaseCommandOptions, CommandTypes } from '../../types';
+import { isPermissionResolvable, normalizeCommandName, validateArray, validateDuration, validateOneOf, validateOptions, validateRequired, validateType, withKind } from '../../utils';
+import { BaseCommandOptions, CommandContexts, CommandScopes, CommandTypes, IntegrationTypes } from '../../types';
+import { FrameworkTypeError } from '../../core/FrameworkError';
 
 
-export function BaseCommand(options: BaseCommandOptions) {
+export function BaseCommand<T extends BaseCommandOptions>(options: T) {
+  validateOptions(options);
 
-  if (!options) throw new FrameworkError('NoOptions');
-  if (typeof options !== 'object') throw new FrameworkTypeError('InvalidType', 'options', 'object', typeof options);
+  validateRequired(options.name, 'name');
+  validateType(options.name, 'name', 'string');
+  validateRequired(options.description, 'description');
+  validateType(options.description, 'description', 'string');
+  validateRequired(options.commandType, 'commandType');
+  validateOneOf(options.commandType, 'commandType', CommandTypes);
 
-  if (!options.name || !options.name?.length) throw new FrameworkError('InvalidOption', 'name');
-  if (typeof options.name !== 'string') throw new FrameworkTypeError('InvalidType', 'name', 'string', typeof options.name);
-
-  if (!options.description || !options.description?.length) throw new FrameworkError('InvalidOption', 'description');
-  if (typeof options.description !== 'string') throw new FrameworkTypeError('InvalidType', 'description', 'string', typeof options.description);
-
-  if (!options.commandType) throw new FrameworkError('InvalidOption', 'commandType');
-  if (!CommandTypes.includes(options.commandType)) throw new FrameworkError('InvalidValue', 'commandType', CommandTypes);
-
-  if (options.memberPermissions !== undefined && !isPermissionResolvable(options.memberPermissions)) {
-    throw new FrameworkTypeError('InvalidType', 'memberPermissions', 'PermissionResolvable', typeof options.memberPermissions);
+  for (const key of ['memberPermissions', 'clientPermissions'] as const) {
+    if (options[key] !== undefined && !isPermissionResolvable(options[key])) {
+      throw new FrameworkTypeError('InvalidType', key, 'PermissionResolvable', typeof options[key]);
+    }
   }
-  if (options.clientPermissions !== undefined && !isPermissionResolvable(options.clientPermissions)) {
-    throw new FrameworkTypeError('InvalidType', 'clientPermissions', 'PermissionResolvable', typeof options.clientPermissions);
-  }
+  validateDuration(options.cooldown, 'cooldown');
+  validateType(options.disabled, 'disabled', 'boolean');
+  validateType(options.category, 'category', 'string');
 
-  if (options.cooldown && typeof options.cooldown !== 'number') throw new FrameworkTypeError('InvalidType', 'cooldown', 'number', typeof options.cooldown);
-  if (options.disabled !== undefined && typeof options.disabled !== 'boolean') throw new FrameworkTypeError('InvalidType', 'disabled', 'boolean', typeof options.disabled);
-
-  return {
+  const name = normalizeCommandName(options.name, options.commandType);
+  return withKind('command', {
     ...options,
-    id: `${options.commandType}:${options.name}`,
-    name: normalizeCommandName(options.name, options.commandType),
-    description: options.description,
-    commandType: options.commandType,
-    memberPermissions: options.memberPermissions ?? undefined,
-    clientPermissions: options.clientPermissions ?? undefined,
-    cooldown: options.cooldown ?? undefined,
+    id: `${options.commandType}:${name}`,
+    filepath: '',
+    name,
     disabled: options.disabled ?? false,
-  };
+  });
+}
+
+export function validateAppCommandOptions(options: { commandScope?: unknown; commandContexts?: unknown; integrationTypes?: unknown }) {
+  if (options.commandScope !== undefined) validateOneOf(options.commandScope, 'commandScope', CommandScopes);
+  validateArray(options.commandContexts, 'commandContexts', { allowed: CommandContexts });
+  validateArray(options.integrationTypes, 'integrationTypes', { allowed: IntegrationTypes });
 }

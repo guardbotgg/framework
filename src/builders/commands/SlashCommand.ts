@@ -1,31 +1,47 @@
-import { CommandScopes, CommandContexts, IntegrationTypes, SlashCommandOptions as CommandOptions } from '../../types';
-import { ApplicationIntegrationType, InteractionContextType } from 'discord.js';
+import { BaseSlashCommandOptions, CommandContextsInput, IntegrationTypesInput, FrameworkSlashCommand, SlashCommandHandlers } from '../../types';
+import { getSubcommandHandler, getSubcommandNames, normalizeOptions, validateOptions, validateType } from '../../utils';
 import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
-import { normalizeOptions } from '../../utils';
-import { BaseCommand } from './BaseCommand';
+import { BaseCommand, validateAppCommandOptions } from './BaseCommand';
+import { APIApplicationCommandOption } from 'discord.js';
 
 
-type SlashCommandOptions = Omit<CommandOptions, 'commandType'>;
-export function SlashCommand(options: SlashCommandOptions) {
+type SlashCommandOptions<C extends CommandContextsInput, I extends IntegrationTypesInput> = (
+  Omit<BaseSlashCommandOptions<C, I>, 'commandType'> & SlashCommandHandlers<C, I>
+);
 
-  if (!options.commandScope) throw new FrameworkError('InvalidOption', 'commandScope');
-  if (typeof options.commandScope !== 'string' || !CommandScopes.includes(options.commandScope)) throw new FrameworkError('InvalidValue', 'commandScope', CommandScopes);
+export function SlashCommand<const C extends CommandContextsInput = undefined, const I extends IntegrationTypesInput = undefined>(options: SlashCommandOptions<C, I>) {
+  validateOptions(options);
+  validateAppCommandOptions(options);
+  validateType(options.execute, 'execute', 'function');
+  validateType(options.subcommands, 'subcommands', 'object');
+  validateType(options.autocomplete, 'autocomplete', 'function');
+  if (options.options !== undefined && !Array.isArray(options.options) && typeof options.options !== 'function') {
+    throw new FrameworkTypeError('InvalidType', 'options', 'Array | function', typeof options.options);
+  }
 
-  if (options.commandContexts && !Array.isArray(options.commandContexts)) throw new FrameworkTypeError('InvalidType', 'commandContexts', 'Array', typeof options.commandContexts);
-  if (options.commandContexts && options.commandContexts.some(c => !CommandContexts.includes(c))) throw new FrameworkError('InvalidValues', 'commandContexts', CommandContexts);
+  const commandOptions = normalizeOptions(options.options);
+  validateHandlers(options, commandOptions);
 
-  if (options.integrationTypes && !Array.isArray(options.integrationTypes)) throw new FrameworkTypeError('InvalidType', 'integrationTypes', 'Array', typeof options.integrationTypes);
-  if (options.integrationTypes && options.integrationTypes.some(c => !IntegrationTypes.includes(c))) throw new FrameworkError('InvalidValues', 'integrationTypes', IntegrationTypes);
-
-  if (!options.execute) throw new FrameworkError('InvalidOption', 'execute');
-  if (typeof options.execute !== 'function') throw new FrameworkTypeError('InvalidType', 'execute', 'function', typeof options.execute);
-
-  options.options = normalizeOptions(options.options);
-  if (!options.commandContexts || !options.commandContexts.length) options.commandContexts = [InteractionContextType.Guild];
-  if (!options.integrationTypes || !options.integrationTypes.length) options.integrationTypes = [ApplicationIntegrationType.GuildInstall];
-  
   return BaseCommand({
     ...options,
     commandType: 'Slash',
-  });
+    commandScope: options.commandScope ?? 'default',
+    options: commandOptions,
+  }) as unknown as FrameworkSlashCommand<C, I>;
+}
+
+function validateHandlers({ execute, subcommands }: { execute?: unknown; subcommands?: Record<string, unknown> }, options: APIApplicationCommandOption[]) {
+  if (!execute && !subcommands) throw new FrameworkError('InvalidOption', 'execute', 'subcommands');
+  if (!subcommands) return;
+
+  const names = getSubcommandNames(options);
+  for (const [name, handler] of Object.entries(subcommands)) {
+    if (!names.includes(name)) throw new FrameworkError('UnknownSubcommand', name, names);
+    validateType(handler, `subcommands.${name}`, 'function');
+  }
+  if (execute) return;
+
+  if (!names.length) throw new FrameworkError('InvalidOption', 'execute');
+  const unhandled = names.find(name => typeof getSubcommandHandler(subcommands, name) !== 'function');
+  if (unhandled) throw new FrameworkError('InvalidOption', `subcommands.${unhandled}`, 'execute');
 }
