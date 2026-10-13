@@ -1,7 +1,6 @@
 import { ClientEvents } from 'discord.js';
 
 
-type Result = unknown | void;
 export interface ListenerOptions<T extends keyof ClientEvents = keyof ClientEvents> {
   /** Name of the Listener */
   name: T;
@@ -10,7 +9,7 @@ export interface ListenerOptions<T extends keyof ClientEvents = keyof ClientEven
   /** Whether the Listener is disabled */
   disabled?: boolean;
   /** Handles the execution of the Listener */
-  execute: (...args: ClientEvents[T]) => Promise<Result> | Result;
+  execute: (...args: ClientEvents[T]) => unknown;
 }
 
 interface BaseListenerMeta {
@@ -22,6 +21,5 @@ export interface FrameworkListener<T extends keyof ClientEvents = keyof ClientEv
   name: T;
   once: boolean;
   disabled: boolean;
-  execute: (...args: ClientEvents[T]) => Promise<Result> | Result;
-  _execute?: (...args: ClientEvents[T]) => Promise<Result> | Result;
+  execute: (...args: ClientEvents[T]) => unknown;
 }

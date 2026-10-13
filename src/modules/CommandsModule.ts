@@ -1,125 +1,112 @@
-import { listFiles, resolveCommandContexts, resolveIntegrationTypes, unixTimestamp, createPrefixRegex, pathToFileURL, resolvePath, resolvePermissions, formatPermissions } from '../utils';
-import { FrameworkCommand, FrameworkSlashCommand, FrameworkContextCommand, CommandCustomHandlers, CommandMiddleware, CommandEvents } from '../types';
-import { ApplicationCommandType, Collection, Interaction, Message, MessageFlags } from 'discord.js';
+import {
+  resolveCommandContexts, resolveIntegrationTypes, createPrefixRegex, resolvePermissions, formatPermissions, emitClientError, emitDebug, requiresCachedGuild,
+  replyWithError, passesMiddleware, passesCooldown, passesGuildCheck, replyTemporarily, parseArgs, getSubcommandName, getSubcommandHandler, getTopFolder, reply,
+} from '../utils';
+import { FrameworkCommand, FrameworkAppCommand, CommandEvents, RegisteredClient } from '../types';
+import { ApplicationCommandType, ChatInputCommandInteraction, Collection, ContextMenuCommandInteraction, Interaction, Message } from 'discord.js';
 import { FrameworkClient } from '../core/FrameworkClient';
 import { FrameworkError } from '../core/FrameworkError';
-import { TypedEmitter } from 'tiny-typed-emitter';
+import BaseModule from './BaseModule';
 
 
-export default class CommandsModule extends TypedEmitter<CommandEvents> {
-  private client: FrameworkClient<true>;
-  private handlers: CommandCustomHandlers = {};
-  private middleware?: CommandMiddleware;
-  private prefixRegex?: RegExp;
+export default class CommandsModule extends BaseModule<FrameworkCommand, CommandEvents> {
+  protected readonly label = 'command';
+  private prefixRegex?: { key: string; regex: RegExp };
+  private republishTimer?: NodeJS.Timeout;
+  protected republishDelay = 60_000;
+
+  protected get directory() { return this.client.commandsDir; }
+  public get collection() { return this.client.commands; }
 
   constructor(client: FrameworkClient) {
-    super();
-    this.client = client as FrameworkClient<true>;
-    this.client.on('messageCreate', (message) => this._handleMessage(message));
-    this.client.on('interactionCreate', (interaction) => this._handleInteraction(interaction));
+    super(client);
+    this.client.on('messageCreate', (message) => this.handleMessage(message).catch(error => emitClientError(this.client, error)));
+    this.client.on('interactionCreate', (interaction) => this.handleInteraction(interaction).catch(error => emitClientError(this.client, error)));
   }
 
-  setHandler<K extends keyof CommandCustomHandlers>(key: K, callback: NonNullable<CommandCustomHandlers[K]>) {
-    this.handlers[key] = callback;
-    return true;
-  }
-
-  setMiddleware(callback: CommandMiddleware) {
-    this.middleware = callback;
-    return true;
-  }
-
-
-  async load(filepath: string, reload: boolean = false) {
-    const module = await import(pathToFileURL(filepath).href  + `?update=${Date.now()}`);
-    const command: FrameworkCommand = module?.command ?? module?.default?.default ?? module?.default ?? module;
-
-    if (typeof command !== 'object' || !command.name || command.disabled) return false;
-    if (!reload && this.client.commands.has(command.id)) throw new FrameworkError('ComponentAlreadyLoaded', 'command', command.id);
-
-    command.filepath = filepath;
-    this.client.commands.set(command.id, command);
-
-    if (command.commandType === 'Message' && Array.isArray(command.aliases)) command.aliases.forEach((alias: any) => {
-      if (typeof alias === 'string' && !this.client.aliases.get(alias)) this.client.aliases.set(alias, command.id);
-    });
-    return true;
-  }
-
-  async loadAll() {
-    const files = await listFiles(this.client.commandsDir);
-
-    for (const file of files) {
-      try {
-        await this.load(resolvePath(file));
-      } catch (error) {
-        this.client.emit('error', new FrameworkError('ComponentLoadError', 'commands', error));
-      }
-    }
-  }
- 
-  async reload(id: string) {
-    if (!this.client.commands.has(id)) throw new FrameworkError('UnknownComponent', 'commands', id);
-    const command = this.client.commands.get(id)!;
-
-    this.unload(id, true);
-    await this.load(command.filepath, true);
-  }
-
-  private unload(id: string, reload: boolean = false) {
-    if (!this.client.commands.has(id)) throw new FrameworkError('UnknownComponent', 'commands', id);
-    const command = this.client.commands.get(id)!;
-    
-    delete require.cache[require.resolve(command.filepath)];
-    if (!reload) this.client.commands.delete(id);
-  }
-
-
-  async registerOnStart(guildIds: string[], commands?: Collection<string, FrameworkCommand>) {
-    for (const guildId of guildIds) {
-      try {
-        await this.publishGuild(guildId, commands);
-      } catch (error) {
-        this.client.emit('error', new FrameworkError('AppCommandRegister', error, guildId));
-      }
-    }
-  }
 
   async publishGlobal(commands?: Collection<string, FrameworkCommand>) {
-    if (!this.client.application) return false;
-    const commandsToSet = (commands ?? this.client.commands).filter(c => c.commandType !== 'Message' && c.commandScope !== 'guild' && !c.disabled).map((c: any) => this._getCommandData(c));
-    return this.client.application.commands.set(commandsToSet);
+    const application = this.getApplication('publish global commands');
+    const published = await application.commands.set(this.getCommandsData(commands, 'guild'));
+    emitDebug(this.client, `Published ${published.size} global application command(s)`);
+    return published;
   }
 
   async publishGuild(guildId: string, commands?: Collection<string, FrameworkCommand>) {
-    const commandsToSet = (commands ?? this.client.commands).filter(c => c.commandType !== 'Message' && c.commandScope !== 'global' && !c.disabled).map((c: any) => this._getCommandData(c));
-    const guild = await this.client.guilds.fetch({ guild: guildId, force: false });
-    if (guild) guild.commands.set(commandsToSet);
+    const application = this.getApplication('publish guild commands');
+    const data = this.getCommandsData(commands, 'global');
+
+    const guild = this.client.guilds.cache.get(guildId);
+    const published = await (guild ? guild.commands.set(data) : application.commands.set(data, guildId));
+
+    if (!guild) published.forEach((_, id) => application.commands.cache.delete(id));
+    emitDebug(this.client, `Published ${published.size} application command(s) to guild "${guildId}"`);
+    return published;
+  }
+
+  async publishGuilds(guildIds: string[], commands?: Collection<string, FrameworkCommand>) {
+    const results = await Promise.allSettled(guildIds.map(guildId => this.publishGuild(guildId, commands)));
+    const failed = guildIds.filter((_, i) => results[i]!.status === 'rejected');
+    if (failed.length) {
+      const errors = results.flatMap(result => (result.status === 'rejected' ? [result.reason] : []));
+      throw new FrameworkError('AppCommandRegister', new AggregateError(errors, 'Failed to register commands'), failed);
+    }
+  }
+
+  override dispose() {
+    super.dispose();
+    clearTimeout(this.republishTimer);
   }
 
 
-  private async _handleMessage(message: Message) {
-    if (!message.content?.length || message.author.bot) return;
-    if (!this.prefixRegex) this.prefixRegex = createPrefixRegex(message.client.user.id, this.client.prefix);
+  protected override onWatchedChange(previous: FrameworkCommand | undefined, current: FrameworkCommand | undefined) {
+    const guilds = this.client.registerCommandsOptions?.guilds;
+    if (!guilds?.length || !this.client.isReady() || !this.client.isPrimaryShard) return;
 
-    if (!this.prefixRegex.test(message.content.toLowerCase())) return;
-    const matchedPrefix = message.content.toLowerCase().match(this.prefixRegex)?.[1];
+    const data = (command?: FrameworkCommand) => (command && command.commandType !== 'Message' ? JSON.stringify(this.getCommandData(command)) : null);
+    if (data(previous) === data(current)) return;
+
+    clearTimeout(this.republishTimer);
+    this.republishTimer = setTimeout(() => {
+      this.publishGuilds(guilds).catch(error => emitClientError(this.client, error));
+    }, this.republishDelay).unref();
+  }
+
+  protected override register(command: FrameworkCommand) {
+    command.category ??= getTopFolder(this.directory, command.filepath);
+    super.register(command);
+    if (command.commandType !== 'Message') return;
+    for (const alias of command.aliases) {
+      const owner = this.client.aliases.get(alias);
+      if (!owner) this.client.aliases.set(alias, command.id);
+      else if (owner !== command.id) emitDebug(this.client, `Skipped the alias "${alias}" of "${command.id}", as "${owner}" already uses it`);
+    }
+  }
+
+  protected override unregister(command: FrameworkCommand) {
+    super.unregister(command);
+    if (command.commandType !== 'Message') return;
+    for (const alias of command.aliases) if (this.client.aliases.get(alias) === command.id) this.client.aliases.delete(alias);
+  }
+
+
+  private async handleMessage(message: Message) {
+    if (!message.content?.length || message.author.bot) return;
+
+    const matchedPrefix = message.content.match(this.getPrefixRegex())?.[0];
     if (!matchedPrefix) return;
 
-    const args = (message.content || '').slice(matchedPrefix.length).trim().split(/ +/);
-    const commandName = args.shift()?.toLowerCase();
-    if (!commandName) return;
+    const body = message.content.slice(matchedPrefix.length).trim();
+    const rawName = body.split(/\s+/, 1)[0];
+    if (!rawName) return;
 
-    const commandId = `Message:${commandName}`;
-    const command = this.client.commands.get(commandId) || this.client.commands.get(this.client.aliases.get(commandName) || '');
-    if (!command || command.commandType !== 'Message' || command.disabled || (command.devOnly && !this.client.developers.includes(message.author.id))) return;
-    if ((!message.inGuild() && !command.contexts.includes('BotDM')) || (message.inGuild() && !command.contexts.includes('Guild'))) return;
+    const commandName = rawName.toLowerCase();
+    const command = this.client.commands.get(`Message:${commandName}`) ?? this.client.commands.get(this.client.aliases.get(commandName) ?? '');
+    if (!command || command.commandType !== 'Message' || command.disabled) return;
+    if (command.devOnly && !this.client.developers.includes(message.author.id)) return;
+    if (!command.contexts.includes(message.inGuild() ? 'Guild' : 'BotDM')) return;
 
-    if (this.middleware) {
-      const shouldContinue = await this.middleware(message, command);
-      if (!shouldContinue) return;
-    }
-
+    if (!(await passesMiddleware(this.client, message, command))) return;
 
     if (message.inGuild()) {
       const [executer, clientMember] = await Promise.all([
@@ -132,130 +119,92 @@ export default class CommandsModule extends TypedEmitter<CommandEvents> {
         const memberPerms = resolvePermissions(executer!, message.channel);
         if (!memberPerms.has(command.memberPermissions)) {
           const missing = memberPerms.missing(command.memberPermissions);
-
-          if (typeof this.handlers.onMemberPermissions === 'function') return this.handlers.onMemberPermissions(message, command, missing);
-          return message.reply({ content: 'You don\'t have the required permission(s) to use this command.' }).then(m => {
-            setTimeout(() => m.delete().catch(e => null), 10000);
-          }).catch(() => null);
+          if (this.client.hooks.onMemberPermissions) return this.client.hooks.onMemberPermissions(message, command, missing);
+          return replyTemporarily(message, 'You don\'t have the required permission(s) to use this command.', 10000);
         }
       }
 
       if (command.clientPermissions) {
         const clientPerms = resolvePermissions(clientMember!, message.channel);
-        if (!clientPerms.has(command.clientPermissions))  {  
+        if (!clientPerms.has(command.clientPermissions)) {
           const missing = clientPerms.missing(command.clientPermissions);
-
-          if (typeof this.handlers.onClientPermissions === 'function') return this.handlers.onClientPermissions(message, command, missing);
-          return message.reply({ content: `${clientMember!.displayName} requires ${formatPermissions(missing)} permission(s) to run this command.` }).then(m => {
-            setTimeout(() => m.delete().catch(e => null), 10000);
-          }).catch(() => null);
+          if (this.client.hooks.onClientPermissions) return this.client.hooks.onClientPermissions(message, command, missing);
+          return replyTemporarily(message, `${clientMember!.displayName} requires ${formatPermissions(missing)} permission(s) to run this command.`, 10000);
         }
       }
     }
 
-    if (command.cooldown && command.cooldown > 1000) {
-      if (!this.client.cooldowns.has(commandId)) this.client.cooldowns.set(commandId, new Collection());
-      const commandCooldowns = this.client.cooldowns.get(commandId);
-      
-      if (commandCooldowns) {
-        if (commandCooldowns.has(message.author.id)) {
-          const expiresAt = new Date((commandCooldowns.get(message.author.id) || 0) + command.cooldown).valueOf();
-          const now = Date.now();
+    if (!(await passesCooldown(this.client, message, command, message.author.id))) return;
 
-          if (expiresAt - now > 1000) {
-            if (typeof this.handlers.onCooldown === 'function') return this.handlers.onCooldown(message, command, new Date(expiresAt));
-            return message.reply({ content: `Slow down and try the Command Again **${unixTimestamp(new Date(expiresAt), 'R')}**.` }).then(m => {
-              setTimeout(() => m.delete().catch(e => null), expiresAt - Date.now());
-            });
-          }
-        }
-        commandCooldowns.set(message.author.id, new Date().valueOf());
-        setTimeout(() => commandCooldowns.delete(message.author.id), command.cooldown);
-      }
-    }
-
-
-    try {
-      this.emit('execute', { command, context: message });
-      if (message.inGuild() && command.contexts.includes('Guild')) { 
-        await command.execute(this.client, message, args);
-      } 
-      else if (!message.inGuild() && command.contexts.includes('BotDM')) {
-        await command.execute(this.client, message as any, args);
-      }
-      this.emit('success', { command, context: message });
-    } catch (error) {
-      this.emit('error', { command, context: message, error });
-    }
+    const args = parseArgs(body.slice(rawName.length).trim(), command.quotedArgs);
+    await this.runHandler(
+      { command, context: message },
+      () => command.execute(this.client as RegisteredClient, message as never, args),
+      (error) => replyWithError(this.client, message, error, command),
+    );
   }
 
 
-  private async _handleInteraction(interaction: Interaction) {
+  private async handleInteraction(interaction: Interaction) {
     if (!interaction.isChatInputCommand() && !interaction.isContextMenuCommand()) return;
 
-    const commandId = `${this._getCommandId(interaction)}:${interaction.commandName}`;
-    const command = this.client.commands.get(commandId);
-    if (!command || command.disabled || command.commandType === 'Message') {
-      this.emit('unknown', interaction);
-      return;
-    }
+    const command = this.client.commands.get(`${getCommandType(interaction)}:${interaction.commandName}`);
+    if (!command || command.disabled || command.commandType === 'Message') return this.emitSafely('unknown', interaction);
 
-    if (this.middleware) {
-      const shouldContinue = await this.middleware(interaction, command);
-      if (!shouldContinue) return;
-    }
+    const run = this.getRunner(command, interaction);
+    if (!run) return this.emitSafely('unknown', interaction);
 
+    if (!(await passesGuildCheck(this.client, interaction, command, requiresCachedGuild(command)))) return;
+    if (!(await passesMiddleware(this.client, interaction, command))) return;
 
-    if (!interaction.inCachedGuild() && (command.commandContexts?.includes('Guild') || command.commandContexts?.includes(0))) return;
     if (command.clientPermissions && interaction.inCachedGuild()) {
-      const clientMember = await interaction.guild.members.fetchMe({ force: false });
-      const clientPerms = resolvePermissions(clientMember, interaction.channel);
-
-      if (!clientPerms.has(command.clientPermissions)) {
-        const missing = clientPerms.missing(command.clientPermissions);
-        if (typeof this.handlers.onClientPermissions === 'function') return this.handlers.onClientPermissions(interaction, command, missing);
-        return interaction.reply({ content: `${clientMember.displayName} requires ${formatPermissions(missing)} permission(s) to run this command.`, flags: MessageFlags.Ephemeral });
-      }
-    }
-   
-
-    if (command.cooldown && command.cooldown > 1000) {
-      if (!this.client.cooldowns.has(commandId)) this.client.cooldowns.set(commandId, new Collection());
-      const commandCooldowns = this.client.cooldowns.get(commandId);
-      
-      if (commandCooldowns) {
-        if (commandCooldowns.has(interaction.user.id)) {
-          const expiresAt = new Date((commandCooldowns.get(interaction.user.id) || 0) + command.cooldown).valueOf();
-          
-          if (expiresAt - Date.now() > 1000) {
-            if (typeof this.handlers.onCooldown === 'function') return this.handlers.onCooldown(interaction, command, new Date(expiresAt));
-            return await interaction.reply({ content: `Slow down and try the Command Again **${unixTimestamp(new Date(expiresAt), 'R')}**.`, flags: MessageFlags.Ephemeral });
-          }
-        }
-        commandCooldowns.set(interaction.user.id, new Date().valueOf());
-        setTimeout(() => commandCooldowns.delete(interaction.user.id), command.cooldown);
+      const missing = interaction.appPermissions.missing(command.clientPermissions);
+      if (missing.length) {
+        if (this.client.hooks.onClientPermissions) return this.client.hooks.onClientPermissions(interaction, command, missing);
+        const name = interaction.guild.members.me?.displayName ?? this.client.user.displayName;
+        return await reply(interaction, `${name} requires ${formatPermissions(missing)} permission(s) to run this command.`);
       }
     }
 
+    if (!(await passesCooldown(this.client, interaction, command, interaction.user.id))) return;
 
-    try {
-      this.emit('execute', { command, context: interaction });
-      await command.execute(this.client, interaction as any);
-      this.emit('success', { command, context: interaction });
-    } catch (error) {
-      this.emit('error', { command, context: interaction, error });
+    await this.runHandler(
+      { command, context: interaction },
+      run,
+      (error) => replyWithError(this.client, interaction, error, command),
+    );
+  }
+
+
+  private getRunner(command: FrameworkAppCommand, interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction): (() => unknown) | null {
+    const client = this.client as RegisteredClient;
+    if (command.commandType === 'Slash' && command.subcommands && interaction.isChatInputCommand()) {
+      const { subcommands } = command;
+      const name = getSubcommandName(interaction);
+      const handler = name ? getSubcommandHandler(subcommands, name) : undefined;
+      if (typeof handler === 'function') return () => handler.call(subcommands, client, interaction as never);
     }
+    return command.execute ? () => command.execute!(client, interaction as never) : null;
   }
 
-
-  private _getCommandId(interaction: Interaction) {
-    if (interaction.isChatInputCommand()) return 'Slash';
-    else if (interaction.isUserContextMenuCommand()) return 'ContextUser';
-    else if (interaction.isMessageContextMenuCommand()) return 'ContextMessage';
-    return 'unknown';
+  private getPrefixRegex() {
+    const key = `${this.client.user.id}:${this.client.prefix}`;
+    if (this.prefixRegex?.key !== key) this.prefixRegex = { key, regex: createPrefixRegex(this.client.user.id, this.client.prefix) };
+    return this.prefixRegex.regex;
   }
 
-  private _getCommandData(command: (FrameworkSlashCommand | FrameworkContextCommand)) {
+  private getApplication(action: string) {
+    if (!this.client.application) throw new FrameworkError('ClientNotReady', action);
+    return this.client.application;
+  }
+
+  private getCommandsData(commands: Collection<string, FrameworkCommand> | undefined, excludedScope: 'guild' | 'global') {
+    return (commands ?? this.client.commands)
+      .filter((c): c is FrameworkAppCommand => c.commandType !== 'Message' && c.commandScope !== excludedScope && !c.disabled)
+      .map(c => this.getCommandData(c));
+  }
+
+  private getCommandData(command: FrameworkAppCommand) {
     const base = {
       name: command.name,
       defaultMemberPermissions: command.memberPermissions ?? null,
@@ -266,22 +215,17 @@ export default class CommandsModule extends TypedEmitter<CommandEvents> {
     };
 
     if (command.commandType === 'Slash') {
-      return {
-        ...base,
-        type: ApplicationCommandType.ChatInput as const,
-        description: command.description,
-        options: command.options,
-      };
-    } else if (command.commandType === 'ContextMessage') {
-      return {
-        ...base,
-        type: ApplicationCommandType.Message as const,
-      };
+      return { ...base, type: ApplicationCommandType.ChatInput as const, description: command.description, options: command.options };
     }
+    if (command.commandType === 'ContextMessage') return { ...base, type: ApplicationCommandType.Message as const };
+    return { ...base, type: ApplicationCommandType.User as const };
+  }
+}
 
-    return {
-      ...base,
-      type: ApplicationCommandType.User as const,
-    };
-  }  
+
+function getCommandType(interaction: Interaction) {
+  if (interaction.isChatInputCommand()) return 'Slash';
+  if (interaction.isUserContextMenuCommand()) return 'ContextUser';
+  if (interaction.isMessageContextMenuCommand()) return 'ContextMessage';
+  return 'unknown';
 }

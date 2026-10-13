@@ -1,10 +1,14 @@
-import { Collection, InteractionCollectorOptions, Message as DiscordMessage, MessageCollectorOptions, ModalSubmitInteraction } from 'discord.js';
-import { FrameworkAutocompleter } from "./autocompleters";
-import { FrameworkListener } from "./listeners";
-import { FrameworkCommand } from "./commands";
-import AutocompleteModule from '../modules/AutocompletersModule';
-import ListenersModule from '../modules/ListenersModule';
-import CommandsModule from '../modules/CommandsModule';
+import { Collection, InteractionCollectorOptions, MessageCollectorOptions, ModalSubmitInteraction } from 'discord.js';
+import type { MessageExtension } from '../extensions/Message';
+import type AutocompletersModule from '../modules/AutocompletersModule';
+import type ComponentsModule from '../modules/ComponentsModule';
+import type ListenersModule from '../modules/ListenersModule';
+import type CommandsModule from '../modules/CommandsModule';
+import { FrameworkAutocompleter } from './autocompleters';
+import { FrameworkComponent } from './components';
+import { ExtensionMembers } from './extensions';
+import { FrameworkListener } from './listeners';
+import { FrameworkCommand } from './commands';
 
 
 export type TimestampTypes = 'f'|'F'|'d'|'D'|'t'|'T'|'R';
@@ -25,18 +29,14 @@ declare module 'discord.js' {
     developers: readonly string[];
     aliases: Collection<string, string>;
     commands: Collection<string, FrameworkCommand>;
+    components: Collection<string, FrameworkComponent>;
     cooldowns: Collection<string, Collection<string, number>>;
     events: Collection<string, FrameworkListener<keyof ClientEvents>>;
     autocompleters: Collection<string, FrameworkAutocompleter>;
     commandsModule: CommandsModule;
+    componentsModule: ComponentsModule;
     listenersModule: ListenersModule;
-    autocompletersModule: AutocompleteModule;
+    autocompletersModule: AutocompletersModule;
   }
-  interface Message {
-    prefix: string;
-    isDeveloper(): boolean;
-    awaitMemberResponse(options?: AwaitMemberResponseOptions): Promise<DiscordMessage>;
-    createModalSubmitCollector(options?: ModalCollectorOptions): InteractionCollector<ModalSubmitInteraction>;
-    awaitModalSubmitComponent(options?: ModalCollectorOptions): Promise<ModalSubmitInteraction>;
-  }
+  interface Message extends ExtensionMembers<typeof MessageExtension> {}
 }

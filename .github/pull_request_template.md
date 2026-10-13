@@ -1,24 +1,23 @@
-## PR Summary
-<!-- Briefly describe a summary of your changes and the motivation in this PR. -->
+## Summary
+<!-- What does this change and why? For bugs, how do you reproduce it? -->
 
 ## Related Issue
-<!-- List any related issues, e.g. Fixes #123 or Closes #456 -->
-Closes # (issue number)
+<!-- For example: Fixes #123 or Closes #456 -->
+Closes #<!-- issue number, if applicable -->
 
 ## Type of Change
 - [ ] Bug fix
 - [ ] New feature
-- [ ] Refactor
-- [ ] Other (please describe)
-
-## Screenshots (if applicable)
-<!-- Add before/after screenshots if this affects rendering. -->
+- [ ] Refactor (no behavior change)
+- [ ] Documentation
+- [ ] Breaking change
 
 ## Checklist
-- [ ] Code follows project structure
-- [ ] Linked relevant issue(s)
-- [ ] No breaking changes
-- [ ] Tested locally
+- [ ] `yarn typecheck`, `yarn lint` and `yarn test` pass.
+- [ ] Added or updated tests where needed.
+- [ ] Tested with a bot using `yarn dev` if it changes how interactions are handled.
+- [ ] Updated `README.md` and `CHANGELOG.md` where applicable.
+- [ ] Added a migration note for breaking changes.
 
-## Additional Notes
-<!-- Anything else reviewers should know. -->
+## Notes for Reviewers
+<!-- Optional: trade-offs, follow-ups, or areas needing extra attention. -->

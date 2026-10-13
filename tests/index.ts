@@ -1,18 +1,15 @@
-import 'dotenv/config';
 import { FrameworkClient } from './framework';
 import { GatewayIntentBits } from 'discord.js';
-import path from 'node:path';
 
 
 const client = new FrameworkClient({
   prefix: '!',
-  rootDir: path.join(__dirname),
+  rootDir: import.meta.dirname,
   clientOptions: {
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
   },
-  registerOnStart: true,
-  guildsToRegister: [],
+  registerCommands: process.env.DEV_GUILD_ID ? { guilds: [process.env.DEV_GUILD_ID] } : undefined,
 });
 
-
+client.on('error', console.error);
 client.start(process.env.DISCORD_TOKEN!);

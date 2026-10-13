@@ -1,26 +1,25 @@
-import { MessageCommandOptions as CommandOptions, MessageCommandContexts } from '../../types';
-import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
+import { MessageCommandOptions as CommandOptions, MessageCommandContexts, MessageCommandContextsInput, FrameworkMessageCommand } from '../../types';
+import { normalizeCommandName, validateArray, validateOptions, validateRequired, validateType } from '../../utils';
 import { BaseCommand } from './BaseCommand';
 
 
-type MessageCommandOptions = Omit<CommandOptions, 'commandType'>;
-export function MessageCommand(options: MessageCommandOptions) {
-
-  if (options.aliases && !Array.isArray(options.aliases)) throw new FrameworkTypeError('InvalidType', 'aliases', 'array', typeof options.aliases);
-  if (options.usage && typeof options.usage !== 'string') throw new FrameworkTypeError('InvalidType', 'usage', 'string', typeof options.usage);
-  
-  if (options.contexts && !Array.isArray(options.contexts)) throw new FrameworkTypeError('InvalidType', 'contexts', 'array', typeof options.contexts);
-  if (options.contexts && options.contexts.some(c => !MessageCommandContexts.includes(c))) throw new FrameworkError('InvalidValues', 'contexts', MessageCommandContexts);
-
-  if (!options.execute) throw new FrameworkError('InvalidOption', 'execute');
-  if (typeof options.execute !== 'function') throw new FrameworkTypeError('InvalidType', 'execute', 'function', typeof options.execute);
-  if (options.devOnly !== undefined && typeof options.devOnly !== 'boolean') throw new FrameworkTypeError('InvalidType', 'devOnly', 'boolean', typeof options.devOnly);
-
-  if (!options.contexts) options.contexts = ['Guild'];
-  if (options.devOnly === undefined) options.devOnly = false;
+type MessageCommandOptions<C extends MessageCommandContextsInput> = Omit<CommandOptions<C>, 'commandType'>;
+export function MessageCommand<const C extends MessageCommandContextsInput = undefined>(options: MessageCommandOptions<C>) {
+  validateOptions(options);
+  validateArray(options.aliases, 'aliases', { type: 'string' });
+  validateType(options.usage, 'usage', 'string');
+  validateArray(options.contexts, 'contexts', { allowed: MessageCommandContexts });
+  validateRequired(options.execute, 'execute');
+  validateType(options.execute, 'execute', 'function');
+  validateType(options.devOnly, 'devOnly', 'boolean');
+  validateType(options.quotedArgs, 'quotedArgs', 'boolean');
 
   return BaseCommand({
     ...options,
     commandType: 'Message',
-  });
+    contexts: options.contexts?.length ? options.contexts : ['Guild'],
+    aliases: [...new Set((options.aliases ?? []).map(alias => normalizeCommandName(alias, 'Message')).filter(Boolean))],
+    devOnly: options.devOnly ?? false,
+    quotedArgs: options.quotedArgs ?? false,
+  }) as unknown as FrameworkMessageCommand<C>;
 }

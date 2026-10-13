@@ -1,6 +1,6 @@
 {
   "name": "@guardbot/framework",
-  "version": "2.1.2",
+  "version": "3.0.0",
   "description": "A simple framework made for building discord bots with discord.js.",
   "type": "module",
   "main": "./build/index.cjs",
@@ -8,20 +8,29 @@
   "types": "./build/index.d.ts",
   "exports": {
     ".": {
-      "types": "./build/index.d.ts",
-      "import": "./build/index.js",
-      "require": "./build/index.cjs",
-      "default": "./build/index.js"
+      "import": {
+        "types": "./build/index.d.ts",
+        "default": "./build/index.js"
+      },
+      "require": {
+        "types": "./build/index.d.cts",
+        "default": "./build/index.cjs"
+      }
     }
   },
   "files": [
     "build",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
-    "clean": "rimraf build",
-    "build": "yarn run clean && tsup",
-    "test": "tsx tests/index.ts"
+    "build": "tsup",
+    "lint": "eslint .",
+    "check:package": "attw --pack .",
+    "typecheck": "tsc && tsc -p tests/tsconfig.json",
+    "dev": "tsx --env-file-if-exists=.env tests/index.ts",
+    "test": "yarn build && node --test \"tests/unit/**/*.test.js\"",
+    "prepublishOnly": "yarn typecheck && yarn lint && yarn test && yarn check:package"
   },
   "publishConfig": {
     "access": "public"
@@ -32,30 +41,35 @@
   },
   "keywords": [
     "discord",
+    "discord.js",
+    "discord-bot",
     "framework",
-    "discord.js"
+    "slash-commands",
+    "typescript"
   ],
   "license": "MIT",
-  "author": "Aniket",
+  "author": "Aniket (github.com/aniket091)",
   "homepage": "https://github.com/guardbotgg/framework#readme",
   "bugs": {
     "url": "https://github.com/guardbotgg/framework/issues"
   },
   "peerDependencies": {
-    "discord.js": "^14.0.0"
+    "discord.js": "^14.22.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "discord.js": "^14.26.3",
-    "dotenv": "^17.3.1",
-    "rimraf": "^5.0.5",
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.0.0",
+    "discord.js": "^14.27.0",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "tiny-typed-emitter": "^2.1.0"
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.1"
   },
   "engines": {
     "node": ">=22.12.0"
-  }
+  },
+  "packageManager": "yarn@1.22.22"
 }

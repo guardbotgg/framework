@@ -1,32 +1,20 @@
-import { ContextCommandOptions, CommandTypes, CommandScopes, CommandContexts, IntegrationTypes } from '../../types';
-import { ApplicationIntegrationType, InteractionContextType } from 'discord.js';
-import { FrameworkError, FrameworkTypeError } from '../../core/FrameworkError';
-import { BaseCommand } from './BaseCommand';
+import { ContextCommandOptions, CommandContextsInput, IntegrationTypesInput, FrameworkContextCommand } from '../../types';
+import { validateOneOf, validateOptions, validateRequired, validateType } from '../../utils';
+import { BaseCommand, validateAppCommandOptions } from './BaseCommand';
 
 
-export function ContextCommand(options: ContextCommandOptions) {
-
-  if (!options.commandType) throw new FrameworkError('InvalidOption', 'commandType');
-  if (options.commandType !== CommandTypes[2] && options.commandType !== CommandTypes[3]) throw new FrameworkError('InvalidValue', 'commandType', CommandTypes);
-
-  if (!options.commandScope) throw new FrameworkError('InvalidOption', 'commandScope');
-  if (typeof options.commandScope !== 'string' || !CommandScopes.includes(options.commandScope)) throw new FrameworkError('InvalidValue', 'commandScope', CommandScopes);
-
-  if (options.commandContexts && !Array.isArray(options.commandContexts)) throw new FrameworkTypeError('InvalidType', 'commandContexts', 'Array', typeof options.commandContexts);
-  if (options.commandContexts && options.commandContexts.some(c => !CommandContexts.includes(c))) throw new FrameworkError('InvalidValues', 'commandContexts', CommandContexts);
-
-  if (options.integrationTypes && !Array.isArray(options.integrationTypes)) throw new FrameworkTypeError('InvalidType', 'integrationTypes', 'Array', typeof options.integrationTypes);
-  if (options.integrationTypes && options.integrationTypes.some(c => !IntegrationTypes.includes(c))) throw new FrameworkError('InvalidValues', 'integrationTypes', IntegrationTypes);
-
-  if (!options.execute) throw new FrameworkError('InvalidOption', 'execute');
-  if (typeof options.execute !== 'function') throw new FrameworkTypeError('InvalidType', 'execute', 'function', typeof options.execute);
-
-  if (!options.commandContexts || !options.commandContexts.length) options.commandContexts = [InteractionContextType.Guild];
-  if (!options.integrationTypes || !options.integrationTypes.length) options.integrationTypes = [ApplicationIntegrationType.GuildInstall];
+const ContextCommandTypes = ['ContextMessage', 'ContextUser'] as const;
+export function ContextCommand<const C extends CommandContextsInput = undefined, const I extends IntegrationTypesInput = undefined>(options: ContextCommandOptions<C, I>) {
+  validateOptions(options);
+  validateRequired(options.commandType, 'commandType');
+  validateOneOf(options.commandType, 'commandType', ContextCommandTypes);
+  validateAppCommandOptions(options);
+  validateRequired(options.execute, 'execute');
+  validateType(options.execute, 'execute', 'function');
 
   return BaseCommand({
     ...options,
-    commandType: options.commandType,
     description: options.description ?? 'no description',
-  });
+    commandScope: options.commandScope ?? 'default',
+  }) as unknown as FrameworkContextCommand<C, I>;
 }

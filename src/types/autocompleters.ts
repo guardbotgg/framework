@@ -1,44 +1,41 @@
-import { FrameworkClient } from '../core/FrameworkClient';
-import { AutocompleteInteraction } from 'discord.js';
+import { AutocompleteInteraction, CacheType } from 'discord.js';
 import { FrameworkSlashCommand } from './commands';
+import { RegisteredClient } from './register';
 
 
-type Result = unknown | void;
-export interface AutocompleterOptions {
-  /** Name of the Autocompleter */
+export type GuildOnlyCacheType<G extends boolean> = G extends false ? CacheType : 'cached';
+
+export interface AutocompleterOptions<G extends boolean = true> {
+  /** Name of the option the Autocompleter responds to */
   name: string;
   /** Whether the Autocompleter is disabled */
   disabled?: boolean;
-  /** Command Names the Autocompleter applies to */
+  /** Names of the Commands the Autocompleter is used for (defaults to all) */
   commands?: string[];
+  /** Whether to only respond in guilds the bot is in (defaults to `true`) */
+  guildOnly?: G;
   /** Handle the execution of the Autocompleter */
   execute: (
-    client: FrameworkClient<true>, interaction: AutocompleteInteraction<'cached'>, command: FrameworkSlashCommand, value: string
-  ) => Promise<Result> | Result;
+    client: RegisteredClient, interaction: AutocompleteInteraction<GuildOnlyCacheType<G>>, command: FrameworkSlashCommand, value: string
+  ) => unknown;
 }
 
-interface BaseAutocompleterMeta {
+
+export interface FrameworkAutocompleter<G extends boolean = boolean> extends AutocompleterOptions<G> {
   id: string;
   filepath: string;
-}
-
-export interface FrameworkAutocompleter extends BaseAutocompleterMeta {
-  name: string;
   disabled: boolean;
-  commands?: string[];
-  execute: (
-    client: FrameworkClient<true>, interaction: AutocompleteInteraction<'cached'>, command: FrameworkSlashCommand, value: string
-  ) => Promise<Result> | Result;
+  guildOnly: G;
 }
 
 
-export interface AutocompleterEvents {
-  /** Fired when an autocompleter starts execution */
-  execute: (context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined }) => void;
-  /** Fired when execution completes successfully */
-  success: (context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined }) => void;
-  /** Fired when execution throws an error */
-  error: (context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined; error: unknown }) => void;
-  /** Fired when no matching autocompleter is found */
-  unknown: (interaction: AutocompleteInteraction) => void;
-}
+export type AutocompleterEvents = {
+  /** Emitted when an autocompleter starts running */
+  execute: [context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined }];
+  /** Emitted when it finishes, with how long it took in ms */
+  success: [context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined; duration: number }];
+  /** Emitted when it throws */
+  error: [context: { command: FrameworkSlashCommand; interaction: AutocompleteInteraction; autocompleter: FrameworkAutocompleter | undefined; error: unknown; duration: number }];
+  /** Emitted when nothing can answer the interaction */
+  unknown: [interaction: AutocompleteInteraction];
+};
