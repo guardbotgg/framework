@@ -96,8 +96,9 @@ export default abstract class BaseModule<T extends LoadableComponent, Events ext
           .then(() => this.handleFileChange(filepath))
           .catch(error => emitClientError(this.client, error));
       }, WATCH_DEBOUNCE_MS).unref());
-    }).unref();
+    });
 
+    this.watcher.unref();
     this.watcher.on('error', (error) => {
       this.unwatch();
       emitClientError(this.client, error);
